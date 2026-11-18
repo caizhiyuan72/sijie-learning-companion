@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { cardMarkup, filterSummaries, recurringFeedback, sortSummaries } from "../teacher.js";
 
 function summary(outcome) {
@@ -130,4 +131,70 @@ test("待关注过滤保留当前求助，重复反馈按题型和阶段逐条�
   assert.deepEqual(attention, [second, first]);
   assert.deepEqual(recurringFeedback(attention), [{ ...note, topic: "方程", count: 2 }]);
   assert.equal(recurringFeedback(all)[0].count, 3);
+});
+
+test("紧凑列表支持分页、跨页查看详情和筛选归位", async t => {
+  const documentMarkup = await readFile(new URL("../teacher.html", import.meta.url), "utf8");
+  const nodes = new Map([...documentMarkup.matchAll(/id="([^"]+)"/g)].map(([, id]) => [id, {
+    listeners: {},
+    dataset: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    setAttribute() {},
+    focus() { document.activeElement = this; },
+    replaceChildren() { this.innerHTML = ""; }
+  }]));
+  const get = id => nodes.get(id);
+  const button = { dataset: {}, textContent: "查看学习记录" };
+  const preview = { dataset: { sessionIndex: "11" }, focus() { document.activeElement = this; } };
+  const dialog = get("teacherDetail");
+  dialog.showModal = () => { dialog.open = true; get("teacherCloseDetail").focus(); };
+  dialog.close = () => { dialog.open = false; dialog.listeners.close(); };
+  get("teacherApiStatus").querySelector = () => ({});
+  globalThis.document = {
+    readyState: "complete",
+    querySelector(selector) {
+      if (selector === "#teacherAuthForm button[type=submit]") return button;
+      if (selector.startsWith("#sessionList [data-session-index=")) {
+        preview.dataset.sessionIndex = selector.match(/\d+/u)[0];
+        return preview;
+      }
+      return get(selector.slice(1));
+    }
+  };
+  t.after(() => { delete globalThis.document; });
+  const sessions = Array.from({ length: 25 }, (_, index) => ({
+    ...summary(undefined),
+    taskTitle: `图形题 ${index + 1}`,
+    task: { problemText: "在△ABC 中，AB＝AC。", problemType: "geometry_proof" },
+    stuckPoint: "找不到对应角",
+    needsHelp: index < 2
+  }));
+  t.mock.method(globalThis, "fetch", async () => ({ ok: true, json: async () => ({ sessions }) }));
+  await import("../teacher.js?navigation-test");
+  get("teacherAuthForm").listeners.submit({ preventDefault() {} });
+  await new Promise(resolve => setImmediate(resolve));
+
+  const list = get("sessionList");
+  assert.equal(list.innerHTML.match(/data-session-index=/gu).length, 12);
+  assert.match(list.innerHTML, /在△ABC 中，AB＝AC。/u);
+  assert.doesNotMatch(list.innerHTML, /原始轨迹|查看学习结果/u);
+  assert.equal(get("teacherPageNumber").textContent, "第 1 / 3 页");
+  list.listeners.click({ target: { closest: () => preview } });
+  assert.equal(dialog.open, true);
+  assert.match(get("teacherDetailBody").innerHTML, /图形题 12[\s\S]+展开原始轨迹/u);
+  get("teacherNextDetail").listeners.click();
+  assert.match(get("teacherDetailBody").innerHTML, /图形题 13/u);
+  assert.equal(get("teacherDetailPosition").textContent, "第 13 / 25 条");
+  get("teacherCloseDetail").listeners.click();
+  assert.equal(get("teacherPageNumber").textContent, "第 2 / 3 页");
+  assert.equal(get("teacherDetailBody").innerHTML, "");
+  assert.equal(document.activeElement.dataset.sessionIndex, "12");
+  get("teacherNextPage").listeners.click();
+  assert.equal(get("teacherPageNumber").textContent, "第 3 / 3 页");
+  assert.equal(get("teacherNextPage").disabled, true);
+  get("teacherAttentionFilter").listeners.click();
+  assert.equal(list.innerHTML.match(/data-session-index=/gu).length, 2);
+  assert.equal(get("teacherPagination").hidden, true);
+  get("clearTeacherSession").listeners.click();
+  assert.doesNotMatch(list.innerHTML, /图形题/u);
 });

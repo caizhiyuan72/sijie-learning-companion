@@ -9,7 +9,7 @@
   <style>
     .teacher-page { min-height: 100vh; background: var(--background); }
     .teacher-topbar { position: static; }
-    .teacher-main { width: min(1180px, 100%); margin: 0 auto; padding: clamp(28px, 5vw, 64px) clamp(18px, 4vw, 48px) 72px; }
+    .teacher-main { width: min(1440px, 100%); margin: 0 auto; padding: clamp(20px, 3vw, 44px) clamp(14px, 3vw, 42px) 56px; }
     .teacher-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 390px); align-items: center; gap: 24px; margin-bottom: 24px; }
     .teacher-intro h1 { margin-top: 8px; font-size: clamp(30px, 4vw, 46px); }
     .teacher-intro p { max-width: 700px; margin: 14px 0 0; color: var(--muted); }
@@ -28,7 +28,31 @@
     .teacher-status { min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; background: #f8fbfa; color: var(--muted); }
     .teacher-status.is-error { border-color: #efc2bd; background: var(--danger-soft); color: var(--danger); }
     .teacher-status.is-success { border-color: #b9dfc6; background: #f4fbf6; color: var(--success); }
-    .teacher-list { display: grid; gap: 16px; }
+    .teacher-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .teacher-list .teacher-empty-state { grid-column: 1 / -1; }
+    .teacher-preview { display: grid; grid-template-rows: auto auto 1fr auto; align-content: start; min-width: 0; gap: 5px; padding: 14px; text-align: start; border: 1px solid var(--line); border-inline-start: 3px solid var(--line); border-radius: 13px; background: white; color: var(--text); }
+    .teacher-preview.is-attention { border-inline-start-color: #c18527; }
+    .teacher-preview:hover { background: #f8fbfa; border-color: #9fc8c1; }
+    .teacher-preview.is-attention:hover { border-inline-start-color: #c18527; }
+    .teacher-preview-head { display: flex; align-items: start; justify-content: space-between; gap: 8px; }
+    .teacher-preview-title, .teacher-preview-problem, .teacher-preview-stuck { display: -webkit-box; min-width: 0; overflow: hidden; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+    .teacher-preview-title { font-size: 16px; line-height: 1.45; -webkit-line-clamp: 1; }
+    .teacher-preview .teacher-badge { min-height: 22px; padding: 2px 7px; font-size: 11px; white-space: nowrap; }
+    .teacher-preview-meta { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .teacher-preview-problem { grid-row: 3; -webkit-line-clamp: 2; align-self: start; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .teacher-preview-stuck { grid-row: 4; padding-top: 5px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.5; -webkit-line-clamp: 1; }
+    .teacher-preview-stuck strong { margin-inline-end: 3px; color: var(--primary-dark); }
+    .teacher-pagination { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 14px; color: var(--muted); font-size: 13px; }
+    #sessionListTitle { scroll-margin-top: 12px; }
+    .teacher-detail { position: fixed; inset: 0 0 0 auto; width: min(100%, 720px); max-width: none; height: 100%; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; border-inline-start: 1px solid var(--line); background: var(--background); color: var(--text); }
+    .teacher-detail[open] { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    .teacher-detail::backdrop { background: rgb(14 35 31 / 48%); }
+    .teacher-page:has(.teacher-detail[open]) { overflow: hidden; }
+    .teacher-detail-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 11px 15px; border-bottom: 1px solid var(--line); background: white; }
+    .teacher-detail-header h2 { font-size: 17px; }
+    .teacher-detail-header span { color: var(--muted); font-size: 12px; }
+    .teacher-detail-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .teacher-detail-body { min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 14px; padding-bottom: max(14px, env(safe-area-inset-bottom)); }
     .teacher-card { padding: clamp(16px, 2.5vw, 24px); border: 1px solid var(--line); border-radius: var(--radius); background: white; }
     .teacher-card.is-attention { border-inline-start: 4px solid #c18527; }
     .teacher-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
@@ -114,6 +138,7 @@
     .teacher-empty-state { padding: 34px 24px; border: 1px dashed #9fc8c1; border-radius: var(--radius); background: rgba(255,255,255,.7); text-align: center; }
     .teacher-empty-state h3 { margin-bottom: 7px; font-size: 20px; }
     .teacher-empty-state p { margin: 0; color: var(--muted); }
+    @media (max-width: 1100px) { .teacher-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     @media (max-width: 800px) {
       .teacher-intro { grid-template-columns: 1fr; }
       .teacher-grid { grid-template-columns: 1fr; }
@@ -126,6 +151,13 @@
       .teacher-actions button { flex: 1; }
       .teacher-card-status { justify-content: start; }
       .teacher-card-head { gap: 8px; }
+      .teacher-list { grid-template-columns: minmax(0, 1fr); gap: 7px; }
+      .teacher-preview { gap: 2px; padding: 8px 10px; }
+      .teacher-preview-problem { -webkit-line-clamp: 1; }
+      .teacher-preview-stuck { padding-top: 3px; }
+      .teacher-detail { inset: auto 0 0; height: 92%; height: 92dvh; border: 0; border-radius: 16px 16px 0 0; }
+      .teacher-detail-header { padding-inline: 10px; }
+      .teacher-detail-body { padding-inline: 9px; }
     }
   </style>
 </head>
@@ -157,7 +189,7 @@
     <section aria-labelledby="sessionListTitle">
       <div class="teacher-toolbar">
         <div>
-          <h2 id="sessionListTitle">学习记录</h2>
+          <h2 id="sessionListTitle" tabindex="-1">学习记录</h2>
           <p id="sessionCount">点击查看后读取；本机可留空口令。</p>
         </div>
         <div class="teacher-actions">
@@ -190,10 +222,27 @@
         <h3 id="teacherRecurringTitle">多次出现的核验反馈</h3>
         <ul id="teacherRecurringList"></ul>
       </section>
-      <div id="sessionList" class="teacher-list" aria-live="polite" style="margin-top:14px">
+      <div id="sessionList" class="teacher-list" aria-live="polite">
         <div class="teacher-empty-state"><h3>等待教师打开记录</h3><p>点击“查看学习记录”后，这里会显示匿名会话。</p></div>
       </div>
+      <nav class="teacher-pagination" id="teacherPagination" aria-label="学习记录分页" hidden>
+        <button class="ghost small-button" id="teacherPrevPage" type="button">上一页</button>
+        <span id="teacherPageNumber" aria-live="polite"></span>
+        <button class="ghost small-button" id="teacherNextPage" type="button">下一页</button>
+      </nav>
     </section>
+
+    <dialog class="teacher-detail" id="teacherDetail" aria-labelledby="teacherDetailTitle">
+      <header class="teacher-detail-header">
+        <div><h2 id="teacherDetailTitle">学习记录详情</h2><span id="teacherDetailPosition" aria-live="polite"></span></div>
+        <div class="teacher-detail-actions">
+          <button class="ghost small-button" id="teacherPrevDetail" type="button">上一条</button>
+          <button class="ghost small-button" id="teacherNextDetail" type="button">下一条</button>
+          <button class="secondary small-button" id="teacherCloseDetail" type="button" autofocus>关闭</button>
+        </div>
+      </header>
+      <div class="teacher-detail-body" id="teacherDetailBody"></div>
+    </dialog>
 
     <details class="teacher-knowledge" aria-labelledby="knowledgeTitle"><summary id="knowledgeTitle">知识库维护</summary>
       <div class="teacher-toolbar">
@@ -251,6 +300,6 @@
     <p class="teacher-note">教师看板只显示匿名编号和本题学习证据。判别、迁移和反思均为本轮过程记录，不代表能力或学习效果；若原话或图片无法确认，请结合课堂情况人工复核。</p>
   </main>
 
-  <script type="module" src="/teacher.js?v=20261118-dashboard"></script>
+  <script type="module" src="/teacher.js?v=20261118-compact"></script>
 </body>
 </html>

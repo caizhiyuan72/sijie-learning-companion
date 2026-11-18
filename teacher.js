@@ -22,6 +22,7 @@ const PROBLEM_LABELS = Object.freeze({
 
 const TRACE_LABELS = Object.freeze({ point_selection: "点选卡点", hint: "查看提示", teacher_request: "向老师求助", help_check: "理解核验" });
 const DEFAULT_FILTERS = Object.freeze({ attention: "all", stage: "all", problemType: "all", stuckPoint: "all" });
+const SESSIONS_PER_PAGE = 12;
 
 const state = {
   token: "",
@@ -30,7 +31,10 @@ const state = {
   loading: false,
   knowledge: [],
   selectedKnowledgeId: "",
-  filters: { ...DEFAULT_FILTERS }
+  filters: { ...DEFAULT_FILTERS },
+  visibleSummaries: [],
+  page: 0,
+  detailIndex: -1
 };
 
 const $ = selector => document.querySelector(selector);
@@ -354,6 +358,22 @@ function recurringFeedback(summaries) {
   return [...groups.values()].filter(item => item.count >= 2).sort((left, right) => right.count - left.count).slice(0, 3);
 }
 
+function sessionPreviewMarkup(summary, index) {
+  const title = text(summary.taskTitle || summary.task?.title, "未命名题目");
+  const student = text(summary.anonymousId, `匿名学生${index + 1}`);
+  const attention = summaryNeedsAttention(summary);
+  const stage = stageLabel(summary.stage);
+  const status = attention ? (summary.helpRequested ? "向老师求助" : "待关注") : stage;
+  const problem = text(summary.task?.problemText);
+  const stuck = stuckLabel(summary);
+  return `<button class="teacher-preview${attention ? " is-attention" : ""}" type="button" data-session-index="${index}" aria-haspopup="dialog">
+    <span class="teacher-preview-head"><strong class="teacher-preview-title">${escapeHtml(title)}</strong><span class="teacher-badge${attention ? " is-attention" : ""}">${escapeHtml(status)}</span></span>
+    <span class="teacher-preview-meta">${escapeHtml(student)} · ${escapeHtml(topicLabel(summary))}</span>
+    ${problem && problem !== title ? `<span class="teacher-preview-problem">${escapeHtml(problem)}</span>` : ""}
+    <span class="teacher-preview-stuck">${stuck ? `<strong>卡点</strong> ${escapeHtml(stuck)}` : "暂无卡点记录"}</span>
+  </button>`;
+}
+
 function cardMarkup(summary, index) {
   const attention = summaryNeedsAttention(summary);
   const anonymousId = text(summary.anonymousId, `匿名学生${index + 1}`);
@@ -441,13 +461,40 @@ function filtersActive() {
   return Object.values(state.filters).some(value => value !== "all");
 }
 
-function renderSummaries() {
+function renderSessionPage() {
   const list = $("#sessionList");
+  const summaries = state.visibleSummaries;
+  const pageCount = Math.ceil(summaries.length / SESSIONS_PER_PAGE);
+  state.page = Math.min(state.page, Math.max(0, pageCount - 1));
+  const start = state.page * SESSIONS_PER_PAGE;
+  const end = Math.min(start + SESSIONS_PER_PAGE, summaries.length);
+  const range = end ? `第 ${start + 1}–${end} 条` : "0 条记录";
+  $("#sessionCount").textContent = state.loaded
+    ? `${range} / 共 ${summaries.length} 条${filtersActive() ? `（筛选前 ${state.summaries.length} 条）` : ""}`
+    : "点击查看后读取；本机可留空口令。";
+  $("#teacherPagination").hidden = pageCount < 2;
+  $("#teacherPageNumber").textContent = `第 ${state.page + 1} / ${pageCount} 页`;
+  $("#teacherPrevPage").disabled = state.page === 0;
+  $("#teacherNextPage").disabled = state.page >= pageCount - 1;
+  if (!summaries.length) {
+    const filteredEmpty = state.loaded && state.summaries.length && filtersActive();
+    list.innerHTML = `<div class="teacher-empty-state"><h3>${filteredEmpty ? "没有符合筛选条件的记录" : state.loaded ? "还没有学习记录" : "等待教师打开记录"}</h3><p>${filteredEmpty ? "可以清除一个筛选条件，再查看全部记录。" : state.loaded ? "学生留下先思或求助记录后，这里会出现摘要。" : "点击“查看学习记录”后，这里会显示匿名会话。"}</p></div>`;
+    return;
+  }
+  list.innerHTML = summaries.slice(start, end).map((summary, index) => sessionPreviewMarkup(summary, start + index)).join("");
+}
+
+function renderSummaries() {
+  const dialog = $("#teacherDetail");
+  if (dialog.open) {
+    state.detailIndex = -1;
+    $("#teacherDetailBody").replaceChildren();
+    dialog.close();
+  }
   refreshFilterOptions();
   const summaries = filterSummaries(sortSummaries(state.summaries));
-  $("#sessionCount").textContent = state.loaded
-    ? `显示 ${summaries.length} / ${state.summaries.length} 条记录`
-    : "点击查看后读取；本机可留空口令。";
+  state.visibleSummaries = summaries;
+  renderSessionPage();
   const attention = $("#teacherAttentionFilter");
   const all = $("#teacherAllFilter");
   $("#teacherControls").hidden = !state.loaded;
@@ -461,12 +508,55 @@ function renderSummaries() {
   $("#teacherRecurringList").innerHTML = repeat.map(item => `<li><small>${escapeHtml(item.topic)} · ${escapeHtml(item.stage)} · ${item.count} 条记录</small>${item.feedback.length > 140
     ? `<details class="teacher-problem-detail"><summary>${escapeHtml(item.feedback.slice(0, 76))}…</summary>${escapeHtml(item.feedback)}</details>`
     : `<span>${escapeHtml(item.feedback)}</span>`}</li>`).join("");
-  if (!summaries.length) {
-    const filteredEmpty = state.loaded && state.summaries.length && filtersActive();
-    list.innerHTML = `<div class="teacher-empty-state"><h3>${filteredEmpty ? "没有符合筛选条件的记录" : state.loaded ? "还没有学习记录" : "等待教师打开记录"}</h3><p>${filteredEmpty ? "可以清除一个筛选条件，再查看全部记录。" : state.loaded ? "学生留下先思或求助记录后，这里会出现摘要。" : "点击“查看学习记录”后，这里会显示匿名会话。"}</p></div>`;
-    return;
-  }
-  list.innerHTML = summaries.map(cardMarkup).join("");
+}
+
+function changeSessionPage(step) {
+  const next = state.page + step;
+  if (next < 0 || next * SESSIONS_PER_PAGE >= state.visibleSummaries.length) return;
+  state.page = next;
+  renderSessionPage();
+  $("#sessionListTitle").focus();
+}
+
+function openSessionDetail(index) {
+  const summary = state.visibleSummaries[index];
+  if (!summary) return;
+  const dialog = $("#teacherDetail");
+  const body = $("#teacherDetailBody");
+  state.detailIndex = index;
+  body.innerHTML = cardMarkup(summary, index);
+  body.scrollTop = 0;
+  $("#teacherDetailPosition").textContent = `第 ${index + 1} / ${state.visibleSummaries.length} 条`;
+  $("#teacherPrevDetail").disabled = index === 0;
+  $("#teacherNextDetail").disabled = index === state.visibleSummaries.length - 1;
+  if (!dialog.open) dialog.showModal();
+  if (document.activeElement?.disabled) $("#teacherCloseDetail").focus();
+}
+
+function bindSessionNavigation() {
+  const dialog = $("#teacherDetail");
+  $("#sessionList").addEventListener("click", event => {
+    const preview = event.target.closest("[data-session-index]");
+    if (preview) openSessionDetail(Number(preview.dataset.sessionIndex));
+  });
+  $("#teacherPrevPage").addEventListener("click", () => changeSessionPage(-1));
+  $("#teacherNextPage").addEventListener("click", () => changeSessionPage(1));
+  $("#teacherPrevDetail").addEventListener("click", () => openSessionDetail(state.detailIndex - 1));
+  $("#teacherNextDetail").addEventListener("click", () => openSessionDetail(state.detailIndex + 1));
+  $("#teacherCloseDetail").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => {
+    if (dialog.open) return;
+    const index = state.detailIndex;
+    state.detailIndex = -1;
+    $("#teacherDetailBody").replaceChildren();
+    if (index < 0 || !state.visibleSummaries[index]) return;
+    const page = Math.floor(index / SESSIONS_PER_PAGE);
+    if (state.page !== page) {
+      state.page = page;
+      renderSessionPage();
+    }
+    $(`#sessionList [data-session-index="${index}"]`)?.focus();
+  });
 }
 
 function setStatus(message, kind = "") {
@@ -525,6 +615,7 @@ function clearTeacherSession() {
   state.selectedKnowledgeId = "";
   state.loaded = false;
   state.filters = { ...DEFAULT_FILTERS };
+  state.page = 0;
   $("#teacherToken").value = "";
   $("#refreshSessions").hidden = true;
   $("#clearTeacherSession").hidden = true;
@@ -737,6 +828,7 @@ function bindFilters() {
   for (const [selector, attention] of [["#teacherAllFilter", "all"], ["#teacherAttentionFilter", "needed"]]) {
     $(selector)?.addEventListener("click", () => {
       state.filters.attention = attention;
+      state.page = 0;
       renderSummaries();
     });
   }
@@ -747,16 +839,19 @@ function bindFilters() {
   ];
   bindings.forEach(([selector, key]) => $(selector)?.addEventListener("change", event => {
     state.filters[key] = String(event.currentTarget.value || "all");
+    state.page = 0;
     renderSummaries();
   }));
   $("#clearTeacherFilters")?.addEventListener("click", () => {
     state.filters = { ...DEFAULT_FILTERS };
+    state.page = 0;
     renderSummaries();
   });
 }
 
 function init() {
   bindFilters();
+  bindSessionNavigation();
   bindTeacherTokenToggle();
   bindKnowledge();
   $("#teacherAuthForm")?.addEventListener("submit", event => {
