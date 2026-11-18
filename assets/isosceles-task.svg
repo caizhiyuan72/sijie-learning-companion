@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 360" role="img" aria-labelledby="title desc">
+  <title id="title">等腰三角形底边中线示意图</title>
+  <desc id="desc">顶点A在上，B和C在底边两端，D为BC中点，连接AD。</desc>
+  <rect width="560" height="360" rx="24" fill="#f7fbfa"/>
+  <path d="M280 45 85 300h390L280 45Z" fill="#dff4ef" stroke="#155e59" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M280 45v255" fill="none" stroke="#d97706" stroke-width="5" stroke-linecap="round"/>
+  <path d="m173 169 13 10m-3-22 13 10M364 178l13-10m-23 1 13-10" stroke="#155e59" stroke-width="4" stroke-linecap="round"/>
+  <path d="m176 292 0 16m208-16v16" stroke="#155e59" stroke-width="4"/>
+  <path d="M280 279h21v21" fill="none" stroke="#d97706" stroke-width="4"/>
+  <g fill="#123f3c" font-family="Arial, 'PingFang SC', sans-serif" font-size="24" font-weight="700">
+    <text x="270" y="34">A</text><text x="58" y="327">B</text><text x="272" y="335">D</text><text x="482" y="327">C</text>
+  </g>
+</svg>

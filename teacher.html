@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="思阶教师看板：查看学生留下的卡点、原话和提示轨迹。">
+  <title>思阶｜教师关注列表</title>
+  <link rel="stylesheet" href="/styles.css?v=20261117-help-options-r2">
+  <style>
+    .teacher-page { min-height: 100vh; background: var(--background); }
+    .teacher-topbar { position: static; }
+    .teacher-main { width: min(1180px, 100%); margin: 0 auto; padding: clamp(28px, 5vw, 64px) clamp(18px, 4vw, 48px) 72px; }
+    .teacher-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 390px); align-items: end; gap: 28px; margin-bottom: 28px; }
+    .teacher-intro h1 { margin-top: 8px; font-size: clamp(30px, 4vw, 46px); }
+    .teacher-intro p { max-width: 700px; margin: 14px 0 0; color: var(--muted); }
+    .teacher-auth { display: grid; gap: 10px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: white; box-shadow: var(--shadow); }
+    .teacher-auth label { gap: 6px; }
+    .teacher-auth small { color: var(--muted); font-weight: 400; }
+    .teacher-auth-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 9px; }
+    .teacher-token-toggle { min-width: 72px; }
+    .teacher-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 20px 0 14px; }
+    .teacher-toolbar h2 { font-size: 22px; }
+    .teacher-toolbar p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+    .teacher-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+    .teacher-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 0 0 14px; }
+    .teacher-filter { display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .teacher-filter select { width: 100%; min-width: 0; }
+    .teacher-status { min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 11px; background: #f8fbfa; color: var(--muted); }
+    .teacher-status.is-error { border-color: #efc2bd; background: var(--danger-soft); color: var(--danger); }
+    .teacher-status.is-success { border-color: #b9dfc6; background: #f4fbf6; color: var(--success); }
+    .teacher-list { display: grid; gap: 16px; }
+    .teacher-card { padding: clamp(20px, 3vw, 30px); border: 1px solid var(--line); border-radius: var(--radius); background: white; box-shadow: var(--shadow); }
+    .teacher-card.is-attention { border-color: #e9c77f; box-shadow: 0 14px 36px rgba(180, 83, 9, .11); }
+    .teacher-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    .teacher-card-head h3 { font-size: 22px; }
+    .teacher-card-meta { margin: 6px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+    .teacher-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .teacher-tags span { max-width: 230px; padding: 4px 8px; border-radius: 999px; background: #eef6f3; color: var(--primary-dark); font-size: 11px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .teacher-badge { display: inline-flex; align-items: center; min-height: 30px; flex: 0 0 auto; padding: 4px 10px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-dark); font-size: 12px; font-weight: 800; }
+    .teacher-badge.is-attention { background: var(--accent-soft); color: #7c4607; }
+    .teacher-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+    .teacher-evidence { min-width: 0; padding: 15px 16px; border: 1px solid #dce9e6; border-radius: 13px; background: #f8fbfa; }
+    .teacher-evidence.is-wide { grid-column: 1 / -1; }
+    .teacher-evidence h4 { margin-bottom: 7px; color: var(--primary-dark); font-size: 14px; }
+    .teacher-evidence p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .teacher-evidence .teacher-empty { color: var(--muted); }
+    .teacher-request { margin-top: 8px; padding-top: 8px; border-top: 1px solid #dce9e6; }
+    .teacher-request:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+    .teacher-request small, .teacher-quote small { display: block; margin-bottom: 3px; color: var(--muted); font-size: 12px; }
+    .teacher-quote { margin: 8px 0 0; padding: 10px 12px; border-left: 3px solid #a9d3cd; border-radius: 0 9px 9px 0; background: white; }
+    .teacher-quote:first-child { margin-top: 0; }
+    .teacher-hint { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; margin-top: 9px; padding: 10px 0 0; border-top: 1px solid #dce9e6; }
+    .teacher-hint:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+    .teacher-hint-level { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--primary-soft); color: var(--primary-dark); font-size: 12px; font-weight: 800; }
+    .teacher-hint p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .teacher-hint small { display: block; margin: 4px 0 2px; color: var(--muted); font-size: 12px; }
+    .teacher-suggestion { border-color: #efd39a; background: #fffbef; }
+    .teacher-suggestion h4 { color: var(--accent); }
+    .teacher-later-evidence { margin-top: 18px; border: 1px solid #d9e6e3; border-radius: 12px; background: #fbfdfc; }
+    .teacher-later-evidence > summary { min-height: 48px; display: flex; align-items: center; padding: 10px 14px; color: var(--primary-dark); font-weight: 800; cursor: pointer; }
+    .teacher-later-grid { margin: 0; padding: 0 14px 14px; }
+    .teacher-status-list { display: grid; gap: 7px; }
+    .teacher-status-list > div { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 10px; align-items: baseline; padding-top: 7px; border-top: 1px solid #dce9e6; }
+    .teacher-status-list > div:first-child { padding-top: 0; border-top: 0; }
+    .teacher-status-list span { color: var(--muted); font-size: 12px; }
+    .teacher-status-list strong { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+    .teacher-evaluation { margin-top: 9px; padding-top: 8px; border-top: 1px solid #dce9e6; }
+    .teacher-evaluation small { color: var(--muted); font-size: 12px; }
+    .teacher-evaluation p { margin-top: 5px; }
+    .teacher-outcome { border-left: 4px solid var(--line); }
+    .teacher-outcome.is-independent { border-left-color: var(--success); background: #f4fbf6; }
+    .teacher-outcome.is-assisted { border-left-color: #496a9f; background: #f5f8ff; }
+    .teacher-outcome.is-review { border-left-color: var(--accent); background: #fffbef; }
+    .teacher-outcome strong { color: var(--ink); }
+    .teacher-trace { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fbfdfc; }
+    .teacher-trace summary { min-height: 48px; display: flex; align-items: center; padding: 10px 14px; color: var(--primary-dark); font-weight: 800; cursor: pointer; }
+    .teacher-trace-body { display: grid; gap: 9px; padding: 0 14px 14px; }
+    .teacher-trace-item { padding: 10px 12px; border-radius: 9px; background: white; }
+    .teacher-trace-item strong { color: var(--ink); }
+    .teacher-trace-item p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .teacher-trace-item small { color: var(--muted); }
+    .teacher-note { margin: 18px 0 0; color: var(--muted); font-size: 13px; }
+    .teacher-knowledge { margin-top: 34px; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--shadow); }
+    .teacher-knowledge-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 430px); gap: 16px; margin-top: 14px; }
+    .teacher-knowledge-list { display: grid; gap: 9px; align-content: start; }
+    .teacher-knowledge-item { padding: 13px 14px; border: 1px solid #dce9e6; border-radius: 11px; background: #f8fbfa; cursor: pointer; text-align: left; }
+    .teacher-knowledge-item.is-selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26, 112, 97, .12); }
+    .teacher-knowledge-item strong { display: block; color: var(--primary-dark); }
+    .teacher-knowledge-item small { display: block; margin-top: 4px; color: var(--muted); }
+    .teacher-knowledge-form { display: grid; gap: 8px; padding: 14px; border: 1px solid #dce9e6; border-radius: 11px; background: #fbfdfc; }
+    .teacher-knowledge-form label { display: grid; gap: 4px; color: var(--ink); font-size: 12px; font-weight: 800; }
+    .teacher-knowledge-form label small { color: var(--muted); font-weight: 400; }
+    .teacher-knowledge-form textarea { resize: vertical; }
+    .teacher-knowledge-strategy { display: grid; gap: 8px; margin: 4px 0; padding: 10px; border: 1px solid #dce9e6; border-radius: 9px; }
+    .teacher-knowledge-strategy legend { padding: 0 4px; color: var(--primary-dark); font-size: 12px; font-weight: 800; }
+    .teacher-knowledge-strategy legend small { margin-left: 5px; color: var(--muted); font-weight: 400; }
+    @media (max-width: 800px) { .teacher-knowledge-layout { grid-template-columns: 1fr; } }
+    .teacher-empty-state { padding: 34px 24px; border: 1px dashed #9fc8c1; border-radius: var(--radius); background: rgba(255,255,255,.7); text-align: center; }
+    .teacher-empty-state h3 { margin-bottom: 7px; font-size: 20px; }
+    .teacher-empty-state p { margin: 0; color: var(--muted); }
+    @media (max-width: 800px) {
+      .teacher-intro { grid-template-columns: 1fr; }
+      .teacher-grid { grid-template-columns: 1fr; }
+      .teacher-evidence.is-wide { grid-column: auto; }
+      .teacher-filters { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 560px) {
+      .teacher-auth-row { grid-template-columns: 1fr; }
+      .teacher-toolbar, .teacher-card-head { align-items: stretch; flex-direction: column; }
+      .teacher-actions button { flex: 1; }
+    }
+  </style>
+</head>
+<body class="teacher-page">
+  <header class="topbar teacher-topbar">
+    <a class="brand" href="/" aria-label="返回思阶学生端">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" role="img"><path d="M6 23h6v-5h6v-5h6V7h3v19H6z"/><path d="m8 12 5-5 4 3 7-6" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span><strong>思阶</strong><small>教师关注列表</small></span>
+    </a>
+    <div class="status-pill" id="teacherApiStatus" role="status" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span>尚未读取学习记录</span></div>
+  </header>
+
+  <main class="teacher-main" id="main">
+    <section class="teacher-intro" aria-labelledby="teacherTitle">
+      <div>
+        <div class="eyebrow">教师看板</div>
+        <h1 id="teacherTitle">先看谁留下了卡点</h1>
+        <p>这里呈现学生留下的卡点、帮助过程、判别理由、迁移解法和反思，帮助你决定下一句追问。内容来自学习记录，不替教师判断学生。</p>
+      </div>
+      <form class="teacher-auth" id="teacherAuthForm" novalidate>
+        <label for="teacherToken">教师口令 <small>本机可直接查看；远程访问需教师口令</small></label>
+        <div class="teacher-auth-row">
+          <input id="teacherToken" name="teacherToken" type="password" autocomplete="current-password" placeholder="本机可留空" aria-describedby="teacherMessage">
+          <button class="ghost teacher-token-toggle" id="teacherTokenToggle" type="button" aria-controls="teacherToken" aria-pressed="false">显示</button>
+          <button class="primary" type="submit">查看学习记录</button>
+        </div>
+      </form>
+    </section>
+
+    <section aria-labelledby="sessionListTitle">
+      <div class="teacher-toolbar">
+        <div>
+          <h2 id="sessionListTitle">学习记录</h2>
+          <p id="sessionCount">点击查看后读取；本机可留空口令。</p>
+        </div>
+        <div class="teacher-actions">
+          <button class="secondary small-button" id="refreshSessions" type="button" hidden>刷新</button>
+          <button class="ghost small-button" id="clearTeacherFilters" type="button">清除筛选</button>
+          <button class="ghost small-button" id="clearTeacherSession" type="button" hidden>清除口令</button>
+        </div>
+      </div>
+      <div class="teacher-filters" aria-label="筛选学习记录">
+        <label class="teacher-filter" for="teacherStageFilter">当前阶段
+          <select id="teacherStageFilter"><option value="all">全部阶段</option></select>
+        </label>
+        <label class="teacher-filter" for="teacherTypeFilter">题型
+          <select id="teacherTypeFilter"><option value="all">全部题型</option></select>
+        </label>
+        <label class="teacher-filter" for="teacherStuckFilter">卡点
+          <select id="teacherStuckFilter"><option value="all">全部卡点</option></select>
+        </label>
+      </div>
+      <div id="teacherMessage" class="teacher-status" role="status" aria-live="polite">尚未读取学习记录。</div>
+      <div id="sessionList" class="teacher-list" aria-live="polite" style="margin-top:14px">
+        <div class="teacher-empty-state"><h3>等待教师打开记录</h3><p>点击“查看学习记录”后，这里会显示匿名会话。</p></div>
+      </div>
+    </section>
+
+    <section class="teacher-knowledge" aria-labelledby="knowledgeTitle">
+      <div class="teacher-toolbar">
+        <div>
+          <h2 id="knowledgeTitle">知识库维护</h2>
+          <p>知识卡和教学策略先保存为草稿，教师发布后才会被AI检索；来源和审核状态会保留。</p>
+        </div>
+        <div class="teacher-actions">
+          <button class="secondary small-button" id="loadKnowledge" type="button">读取知识库</button>
+          <button class="ghost small-button" id="newKnowledge" type="button">新建草稿</button>
+        </div>
+      </div>
+      <div id="knowledgeMessage" class="teacher-status" role="status" aria-live="polite">读取教师口令后可维护知识卡。</div>
+      <div class="teacher-knowledge-layout">
+        <div id="knowledgeList" class="teacher-knowledge-list"><p class="teacher-empty">尚未读取知识库。</p></div>
+        <form id="knowledgeForm" class="teacher-knowledge-form" hidden novalidate>
+          <input type="hidden" id="knowledgeId" name="id"><input type="hidden" id="knowledgeVersion" name="expectedVersion">
+          <label for="knowledgeTitleInput">标题 <small>例如：比例的基本关系</small></label>
+          <input id="knowledgeTitleInput" name="title" required>
+          <label for="knowledgeKind">类型</label>
+          <select id="knowledgeKind" name="kind"><option value="math">数学知识卡</option><option value="strategy">教学策略卡</option></select>
+          <label for="knowledgeGrades">适用年级 <small>可填七年级、八年级、九年级；留空表示初中通用</small></label>
+          <input id="knowledgeGrades" name="gradeRange" placeholder="七年级, 八年级">
+          <label for="knowledgeAliases">知识点别名 <small>用逗号分隔</small></label>
+          <input id="knowledgeAliases" name="aliases" placeholder="例如：等式变形, 解方程">
+          <label for="knowledgeKeywords">关键词 / 别名 <small>用逗号分隔</small></label>
+          <input id="knowledgeKeywords" name="keywords">
+          <label for="knowledgePrinciple">原理</label>
+          <textarea id="knowledgePrinciple" name="principle" rows="3" required></textarea>
+          <label for="knowledgeConditions">适用条件 <small>一行一个</small></label>
+          <textarea id="knowledgeConditions" name="requiredConditions" rows="3"></textarea>
+          <label for="knowledgeAvoid">常见误用 / 不适用情况</label>
+          <textarea id="knowledgeAvoid" name="avoidWhen" rows="3"></textarea>
+          <label for="knowledgeQuestion">引导问题</label>
+          <textarea id="knowledgeQuestion" name="question" rows="2"></textarea>
+          <fieldset class="teacher-knowledge-strategy"><legend>教学策略（可选）<small>不同阶段只写一个教学动作，不写完整解答。</small></legend>
+            <label for="strategyHelp">求助 / 通用提示</label><textarea id="strategyHelp" name="strategyHelp" rows="2"></textarea>
+            <label for="strategyHint1">一级提示</label><textarea id="strategyHint1" name="strategyHint1" rows="2"></textarea>
+            <label for="strategyHint2">二级提示</label><textarea id="strategyHint2" name="strategyHint2" rows="2"></textarea>
+            <label for="strategyHint3">三级提示</label><textarea id="strategyHint3" name="strategyHint3" rows="2"></textarea>
+            <label for="strategyJudgment">判别</label><textarea id="strategyJudgment" name="strategyJudgment" rows="2"></textarea>
+            <label for="strategyTransfer">迁移</label><textarea id="strategyTransfer" name="strategyTransfer" rows="2"></textarea>
+            <label for="strategyReflection">反思</label><textarea id="strategyReflection" name="strategyReflection" rows="2"></textarea>
+          </fieldset>
+          <label for="knowledgeSource">来源说明</label>
+          <input id="knowledgeSource" name="source" placeholder="项目整理，待教师复核">
+          <label for="knowledgeSourceUrl">来源链接 <small>填写能核对内容的教材章节或原始资料地址</small></label>
+          <input id="knowledgeSourceUrl" name="sourceUrl" type="url" placeholder="https://…">
+          <label for="knowledgeReview">教师复核状态 <small>只有实际完成数学内容复核后才选择“已教师复核”</small></label>
+          <select id="knowledgeReview" name="reviewStatus"><option value="pending_teacher_review">待教师复核</option><option value="teacher_reviewed">已教师复核</option></select>
+          <div class="teacher-actions"><button class="primary" type="submit">保存草稿</button><button class="secondary" id="publishKnowledge" type="button">发布当前版本</button><button class="ghost" id="disableKnowledge" type="button">停用</button><button class="ghost" id="knowledgeHistoryButton" type="button">查看版本历史</button></div>
+          <div id="knowledgeHistory" aria-live="polite"></div>
+        </form>
+      </div>
+    </section>
+    <p class="teacher-note">教师看板只显示匿名编号和本题学习证据。判别、迁移和反思均为本轮过程记录，不代表能力或学习效果；若原话或图片无法确认，请结合课堂情况人工复核。</p>
+  </main>
+
+  <script type="module" src="/teacher.js?v=20261117-help-options-r2"></script>
+</body>
+</html>

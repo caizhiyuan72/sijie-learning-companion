@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="思阶——把独立思考写进AI学习流程的初中数学智能学伴。">
+  <title>思阶｜初中数学学习</title>
+  <link rel="modulepreload" href="/app.js?v=20261117-help-options-r2">
+  <link rel="stylesheet" href="/vendor/katex.min.css">
+  <link rel="stylesheet" href="/styles.css?v=20261117-help-options-r2">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <header class="topbar">
+    <a class="brand" href="#main" aria-label="思阶首页">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" role="img"><path d="M6 23h6v-5h6v-5h6V7h3v19H6z"/><path d="m8 12 5-5 4 3 7-6" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      <span><strong>思阶</strong><small>陪你把题目想清楚</small></span>
+    </a>
+    <div class="topbar-actions">
+      <a class="teacher-link" href="/teacher">教师看板</a>
+      <div class="status-pill" id="apiStatus" role="status" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span>正在检查 AI 服务</span></div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="student-shell" id="studentShell" aria-label="学生学习端">
+      <div class="mobile-flow" id="mobileFlow" data-screen="topic">
+        <div class="mobile-track" id="mobileTrack">
+          <section class="mobile-screen mobile-topic" id="mobileTopic" aria-labelledby="mobileTopicHeading">
+            <div class="mobile-topic-head">
+              <div class="eyebrow">题目页</div>
+              <h1 id="mobileTopicHeading" tabindex="-1">先把题目看清楚</h1>
+              <p>在这里导入、确认并回看题目；准备好后，向左滑进入五阶段作答。</p>
+            </div>
+            <aside class="task-panel" aria-label="当前题目">
+              <div class="eyebrow">当前题目</div>
+              <div id="problemEmpty" class="problem-empty">
+                <div class="empty-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M7 7h18v18H7z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m10 20 4-4 3 3 3-5 3 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <strong>还没有题目</strong>
+                <span>在下方上传一张题图，或输入题目文字。</span>
+              </div>
+              <div id="problemSummary" hidden>
+                <div class="task-meta" id="taskMeta">初中 · 数学题</div>
+                <h1 id="taskTitle">等待识别</h1>
+                <p id="taskText" class="task-copy">确认识别稿后，题目会显示在这里。</p>
+                <figure class="diagram-card" id="taskDiagramCard" hidden>
+                  <img id="taskDiagram" alt="题目示意图">
+                  <figcaption id="taskDiagramCaption">题图只保留在本次学习中。</figcaption>
+                </figure>
+                <div class="fact-stack" id="taskFacts" hidden>
+                  <div class="fact-box"><span>已知</span><p id="taskKnown"></p></div>
+                  <div class="fact-box"><span>目标</span><p id="taskGoal"></p></div>
+                  <div class="fact-box" id="taskDiagramFact"><span>图形关系</span><p id="taskDiagramDescription"></p></div>
+                </div>
+                <div class="goal-box" id="learningGoalBox" hidden><span>本题学习目标</span><p id="learningGoal"></p></div>
+              </div>
+              <div class="privacy-note"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 5 6v5c0 4.7 2.9 8.9 7 10 4.1-1.1 7-5.3 7-10V6l-7-3Zm0 4a2 2 0 0 1 2 2v1h1v6H9v-6h1V9a2 2 0 0 1 2-2Zm0 1.5a.5.5 0 0 0-.5.5v1h1V9a.5.5 0 0 0-.5-.5Z"/></svg><span>匿名学习记录。请勿填写姓名、手机号或住址。</span></div>
+            </aside>
+            <div class="topic-import-slot" id="topicImportContent"></div>
+            <div class="mobile-topic-actions">
+              <span id="mobileTopicHint">导入并确认题目后，可以进入当前阶段。</span>
+              <button class="primary" id="mobileTopicNext" type="button" hidden>进入当前阶段</button>
+            </div>
+          </section>
+
+          <section class="mobile-screen mobile-learning" id="mobileLearning" aria-labelledby="stageTitle">
+            <div class="mobile-learning-nav" id="mobileLearningNav">
+              <button class="ghost" id="mobileHome" type="button">回看题目</button>
+              <span>当前阶段作答</span>
+            </div>
+            <section class="workspace" aria-live="polite">
+              <div class="workspace-head">
+                <div>
+                  <div class="eyebrow">你的思考过程</div>
+                  <h2 id="stageTitle" tabindex="-1">先从一道题开始</h2>
+                </div>
+                <span id="anonymousId" class="anonymous-badge">尚未建立匿名会话</span>
+              </div>
+
+              <ol class="stepper" id="stepper" aria-label="学习进度">
+                <li data-step="initial"><span>1</span><b>先思</b><small>独立表达</small></li>
+                <li data-step="help"><span>2</span><b>求助</b><small>逐级提示</small></li>
+                <li data-step="judgment"><span>3</span><b>判别</b><small>核验建议</small></li>
+                <li data-step="transfer"><span>4</span><b>迁移</b><small>换题独立</small></li>
+                <li data-step="reflection"><span>5</span><b>反思</b><small>把方法带走</small></li>
+              </ol>
+
+              <div id="studentContent"></div>
+            </section>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js?v=20261117-help-options-r2"></script>
+</body>
+</html>

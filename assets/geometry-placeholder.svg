@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 450" role="img" aria-labelledby="title desc">
+  <title id="title">几何题图占位图</title>
+  <desc id="desc">教师尚未上传题图，学生可先阅读题目文字。</desc>
+  <rect width="700" height="450" rx="28" fill="#f4faf8"/>
+  <path d="M180 330 350 90l170 240Z" fill="none" stroke="#74b9af" stroke-width="9" stroke-linejoin="round"/>
+  <path d="M350 90v240" fill="none" stroke="#d29a50" stroke-width="7" stroke-dasharray="14 12"/>
+  <circle cx="350" cy="90" r="9" fill="#0f766e"/>
+  <circle cx="180" cy="330" r="9" fill="#0f766e"/>
+  <circle cx="520" cy="330" r="9" fill="#0f766e"/>
+  <circle cx="350" cy="330" r="9" fill="#b45309"/>
+  <text x="350" y="390" text-anchor="middle" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="24" fill="#607572">教师未上传题图 · 请结合题目文字作答</text>
+</svg>

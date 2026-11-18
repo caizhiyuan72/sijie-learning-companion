@@ -1,0 +1,9 @@
+{
+  "name": "sijie-worker",
+  "main": "cloud/worker.mjs",
+  "compatibility_date": "2026-11-06",
+  "assets": { "directory": "cloud/public", "binding": "ASSETS", "run_worker_first": true },
+  "d1_databases": [{ "binding": "DB", "database_name": "sijie-worker", "database_id": "<your-d1-database-id>" }],
+  "ratelimits": [{ "name": "RATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }],
+  "workers_dev": true
+}
