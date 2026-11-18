@@ -214,6 +214,7 @@ function learningOutcome(summary) {
   const labels = {
     independent_pass: "独立通过",
     independent: "独立通过",
+    recognized: "点选正确",
     passed_independently: "独立通过",
     independent_completed: "独立通过",
     assisted_continue: "辅助继续",
@@ -244,6 +245,7 @@ function learningOutcome(summary) {
     const stageStatus = text(source.status).toLowerCase().replace(/[\s-]+/g, "_");
     const stageLabels = {
       independent: "独立通过",
+      recognized: "点选正确",
       assisted: "辅助继续",
       pending: "尚未验证",
       review_required: "需教师复核",

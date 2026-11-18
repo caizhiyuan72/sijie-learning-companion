@@ -139,6 +139,83 @@ test("Cloud Worker API covers recognition, session steps and teacher authenticat
   assert.equal(teacher.payload.sessions.length, 1);
 });
 
+test("方程与几何走完五步，分别记录独立作答和点选证据", async t => {
+  const examples = [
+    {
+      name: "方程",
+      original: "解方程 2x＋3＝11。",
+      statement: "两边减 3 后得到 x＝8。",
+      reasons: ["等式两边必须乘 2", "减 3 后左边仍是 2x", "题目缺少 x 的取值范围"],
+      transfer: { text: "3x＋2＝14。", focusPrompt: "两边减 2 后得到什么等式？", referenceProof: "3x＝12" },
+      answer: "3x＝12"
+    },
+    {
+      name: "几何",
+      original: "△ABC 中，AB＝AC，判断哪两个角相等。",
+      statement: "AB＝AC，所以 ∠A＝∠B。",
+      reasons: ["三角形任意两个角都相等", "等边所对的角分别是 ∠C 和 ∠B", "知道两条边相等仍无法判断"],
+      transfer: {
+        ...sampleTask.transferTask,
+        text: "△DEF 中，DE＝DF，∠D＝40°。",
+        focusPrompt: "要先判断 ∠E 和 ∠F 是否相等，应选哪个已知条件？",
+        referenceProof: "DE＝DF",
+        stepChoice: { options: [{ id: "option-1", text: "∠D＝40°" }, { id: "option-2", text: "DE＝DF" }, { id: "option-3", text: "三角形的内角和是 180°" }], correctOptionId: "option-2" }
+      }
+    }
+  ];
+
+  for (const example of examples) await t.test(example.name, async () => {
+    const model = new class extends FakeModel {
+      async generateJudgmentCard() {
+        return { judgmentCard: { statement: example.statement, correctVerdict: "不合理", reason: example.reasons[1], reasonChoice: { options: example.reasons.map((text, index) => ({ id: `option-${index + 1}`, text })), correctOptionId: "option-2" } } };
+      }
+      async generateTransferTask() { return { transferTask: example.transfer }; }
+      evaluateAnswer(input) {
+        if (input.kind === "judgment" || (input.kind === "transfer" && example.transfer.stepChoice)) assert.fail("点选由服务端直接核验");
+        if (input.kind === "transfer") assert.equal(input.answer.text, example.answer);
+        return super.evaluateAnswer(input);
+      }
+    }();
+    const { worker, env } = setup({ model });
+    const send = (path, body) => call(worker, env, path, { method: "POST", body: JSON.stringify(body) });
+    const analyzed = await send("/api/problem/analyze", { grade: "八年级", problemText: example.original });
+    const created = await send("/api/session", { draftId: analyzed.payload.draftId, draft: analyzed.payload.draft });
+    assert.equal(created.response.status, 201);
+    const route = `/api/session/${created.payload.session.id}`;
+    await send(`${route}/initial`, { text: "先整理已知条件和目标" });
+    const help = await send(`${route}/help`, { text: "我能解释一个关键关系" });
+    const card = help.payload.task.judgmentCard;
+    assert.equal(card.reasonOptions.length, 3);
+    assert.doesNotMatch(JSON.stringify(card), /correctOptionId|correctVerdict|correctIndex/);
+
+    const invalidChoice = await send(`${route}/judgment`, { verdict: "不合理", reasonOptionId: "option-7" });
+    assert.equal(invalidChoice.response.status, 400);
+    assert.equal(invalidChoice.payload.code, "INVALID_STAGE_CHOICE");
+    const wrongVerdict = await send(`${route}/judgment`, { verdict: "合理", reasonOptionId: "option-2" });
+    assert.equal(wrongVerdict.payload.evaluation.decision, "retry");
+    assert.equal(wrongVerdict.payload.session.attemptCounts.judgment, 1);
+    const judgment = await send(`${route}/judgment`, { verdict: "不合理", reasonOptionId: "option-2", reason: "这段客户端文字不参与点选核验" });
+    assert.equal(judgment.payload.evaluation.decision, "pass");
+    assert.equal(judgment.payload.session.answers.judgment.latest.text, example.reasons[1]);
+    assert.equal(judgment.payload.session.learningOutcome.stages.find(stage => stage.key === "judgment").status, "recognized");
+    const task = judgment.payload.task.transferTask;
+    assert.equal(task.focusPrompt, example.transfer.focusPrompt);
+    assert.doesNotMatch(JSON.stringify(task), /correctOptionId|correctIndex|referenceProof/);
+
+    if (example.transfer.stepChoice) {
+      assert.equal(task.stepOptions.length, 3);
+      const bypass = await send(`${route}/transfer`, { text: "DE＝DF" });
+      assert.equal(bypass.response.status, 400);
+    }
+    const transfer = await send(`${route}/transfer`, example.transfer.stepChoice ? { stepOptionId: "option-2" } : { text: example.answer, evidence: "choice" });
+    assert.equal(transfer.payload.session.stage, "reflection");
+    assert.equal(transfer.payload.session.learningOutcome.stages.find(stage => stage.key === "transfer").status, example.transfer.stepChoice ? "recognized" : "independent");
+    const completed = await send(`${route}/reflection`, { nextTime: "我会自己检查关键条件并写出依据。" });
+    assert.equal(completed.payload.session.stage, "completed");
+    assert.equal(completed.payload.session.learningOutcome.status, "recognized");
+  });
+});
+
 test("Cloud Worker marks a structure-only task for teacher review without calling completion mastery", async () => {
   class StructureOnlyModel extends FakeModel {
     generateTask() { return { ...super.generateTask(), mode: "live-recovery", verified: false }; }

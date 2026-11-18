@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { FileStore } from "./lib/store.mjs";
 import { DeepSeekClient } from "./lib/deepseek.mjs";
 import { normalizeProblemAnalysis, taskToPublic } from "./lib/task-schema.mjs";
+import { resolveStageChoice } from "./lib/stage-choice.mjs";
 import { classifyStudentInput, isHelpCompletionSignal, redactPersonalInfo } from "./lib/guardrails.mjs";
 import {
   STAGES,
@@ -686,22 +687,16 @@ async function handleApi(req, res, url) {
     }
 
     if (match[2] === "judgment") {
+      assertStage(session, STAGES.JUDGMENT);
       const verdict = cleanText(body.verdict);
-      const judgmentText = [`选择：${verdict}`, `理由：${body.reason || body.text}`].join("\n");
-      let evaluation;
-      try {
-        evaluation = await model.evaluateAnswer({
-          task,
-          session,
-          stage: STAGES.JUDGMENT,
-          kind: "judgment",
-          answer: { text: judgmentText, imageData: body.imageData }
-        });
-      } catch (error) {
-        throw markModelError(error, "answer_evaluation", req);
-      }
+      const selected = body.reasonOptionId === undefined ? null : resolveStageChoice(task.judgmentCard?.reasonChoice, body.reasonOptionId, { verdict, correctVerdict: task.judgmentCard?.correctVerdict });
+      const input = selected ? { verdict, reason: selected.text } : body;
+      const evaluation = selected?.evaluation || await model.evaluateAnswer({
+        task, session, stage: STAGES.JUDGMENT, kind: "judgment",
+        answer: { verdict, reason: body.reason || body.text, imageData: body.imageData }
+      }).catch(error => { throw markModelError(error, "answer_evaluation", req); });
       recordKnowledgeReferences(session, evaluation, STAGES.JUDGMENT, "answer_evaluation");
-      submitJudgment(session, body, evaluation);
+      submitJudgment(session, input, evaluation);
       const storedEvaluation = session.answers.judgment.evaluation;
       if (session.stage === STAGES.TRANSFER) {
         if (storedEvaluation.decision === "assisted") appendExplanation(storedEvaluation, task.judgmentCard.reason);
@@ -713,14 +708,13 @@ async function handleApi(req, res, url) {
     }
 
     if (match[2] === "transfer") {
-      let evaluation;
-      try {
-        evaluation = await model.evaluateAnswer({ task, session, stage: STAGES.TRANSFER, kind: "transfer", answer: body });
-      } catch (error) {
-        throw markModelError(error, "answer_evaluation", req);
-      }
+      assertStage(session, STAGES.TRANSFER);
+      const selected = task.transferTask?.stepChoice || body.stepOptionId !== undefined ? resolveStageChoice(task.transferTask?.stepChoice, body.stepOptionId) : null;
+      const input = selected ? { answer: selected.text } : body;
+      const evaluation = selected?.evaluation || await model.evaluateAnswer({ task, session, stage: STAGES.TRANSFER, kind: "transfer", answer: body })
+        .catch(error => { throw markModelError(error, "answer_evaluation", req); });
       recordKnowledgeReferences(session, evaluation, STAGES.TRANSFER, "answer_evaluation");
-      submitTransfer(session, body, evaluation);
+      submitTransfer(session, input, evaluation);
       const storedEvaluation = session.answers.transfer.evaluation;
       if (session.stage === STAGES.REFLECTION && storedEvaluation.decision === "assisted") {
         appendExplanation(storedEvaluation, task.transferTask.referenceProof || task.transferTask.answerOutline);

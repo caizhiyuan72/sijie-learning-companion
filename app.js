@@ -728,19 +728,27 @@ function judgmentStatement() {
   return asText(task.judgmentTask?.statement || task.judgmentCard?.statement || task.judgment?.statement || task.judgmentStatement, "AI正在准备一条待核验的解题建议，请稍候重试。 ");
 }
 
+function stageChoiceMarkup(name, legend, options) {
+  return `<fieldset class="choice-field"><legend>${escapeHtml(legend)}</legend><div class="choice-row stage-choice-row">
+    ${options.map(option => `<label><input type="radio" name="${name}" value="${escapeHtml(option.id)}"><span>${escapeHtml(option.text)}</span></label>`).join("")}
+  </div></fieldset>`;
+}
+
 function judgmentTemplate() {
+  const options = state.task?.judgmentCard?.reasonOptions || [];
+  const written = answerComposer("judgment", "reason", "写一句判断理由", "我判断……因为……", "也可以上传手写理由。");
   return `<section class="stage-card">
     <div class="stage-number">阶段三 · 判别</div>
     <h3>AI说得像对的，就一定对吗？</h3>
-    <p class="stage-intro">先判断下面这条解题建议，再说明你的理由。关键判断正确即可通过，不要求证明文字和标准答案一模一样。</p>
+    <p class="stage-intro">${options.length ? "先选判断，再选一个支持你判断的理由。" : "先判断下面这条解题建议，再写一句理由。"}</p>
     ${evaluationCard()}
     <div class="judgment-card"><span>待核验建议</span><p>${escapeHtml(judgmentStatement())}</p></div>
     <form id="judgmentForm" class="field-stack" novalidate>
       <fieldset class="choice-field"><legend>你的判断 <small>三选一</small></legend><div class="choice-row">
         ${["合理", "不合理", "信息不足"].map(value => `<label><input type="radio" name="verdict" value="${value}" required><span>${value}</span></label>`).join("")}
       </div></fieldset>
-      ${answerComposer("judgment", "reason", "为什么这样判断？", "我判断……因为……还需要……", "理由可以用文字写，也可以上传手写推理。")}
-      <div class="form-actions"><span class="helper">选择判断，并提供文字或图片理由。</span><button class="primary" type="submit">提交判断</button></div>
+      ${options.length ? `${stageChoiceMarkup("reasonOptionId", "你的理由", [...options, { id: "own", text: "我有别的理由" }])}<div id="judgmentWrittenReason" hidden>${written}</div>` : written}
+      <div class="form-actions"><button class="primary" type="submit">提交判断</button></div>
     </form>
   </section>`;
 }
@@ -839,19 +847,19 @@ function transferTask() {
 }
 
 function transferTemplate() {
-  const geometry = isGeometryTask(state.task || {});
   const transfer = transferTask();
+  const focusPrompt = asText(transfer.focusPrompt);
+  const options = transfer.stepOptions || [];
   const spec = transfer.diagramSpec || transfer.diagram || (state.task || {}).diagramSpec;
   return `<section class="stage-card">
     <div class="stage-number">阶段四 · 迁移</div>
-    <h3>换一道相似题，重新自己完成</h3>
-    <p class="stage-intro">新题和原题练的是同一个关键方法，但表面会有变化。写主要推理即可，符号不规范也没关系。</p>
+    <h3>换一道题，${options.length ? "选出关键一步" : "自己试一步"}</h3>
     ${evaluationCard()}
     <div class="transfer-task"><span>迁移题</span><p>${escapeHtml(asText(transfer.text || transfer.problemText, "迁移题正在准备，请稍候重试。"))}</p></div>
     <div class="diagram-render" id="transferDiagram" hidden></div>
     <form id="transferForm" class="field-stack" novalidate>
-      ${answerComposer("transfer", "answer", geometry ? "你的迁移证明" : "你的迁移解法", geometry ? "已知……由……可得……所以……" : "先列出关系……再计算或判断……", "用文字或手写图片写出关键步骤，至少提交一种。")}
-      <div class="form-actions"><span class="helper">提交后，AI会判断你的核心方法。</span><button class="primary" type="submit">${geometry ? "提交迁移证明" : "提交迁移解法"}</button></div>
+      ${options.length ? stageChoiceMarkup("stepOptionId", focusPrompt, options) : answerComposer("transfer", "answer", focusPrompt || "写出关键一步", "写一行算式或一句依据……", "也可以上传手写步骤。")}
+      <div class="form-actions"><button class="primary" type="submit">提交迁移作答</button></div>
     </form>
   </section>`;
 }
@@ -881,13 +889,13 @@ function reflectionTemplate() {
   return `<section class="stage-card">
     <div class="stage-number">阶段五 · 反思</div>
     <h3>把帮助还原成自己的方法</h3>
-    <p class="stage-intro">不用写长篇。说清楚自己完成了什么、AI帮助了什么、下次准备先做什么。</p>
+    <p class="stage-intro">可以简短写下自己的尝试、AI 给过的帮助和下次的做法。</p>
     ${evaluationCard()}
     ${reflectionReviewMarkup()}
     <form id="reflectionForm" class="field-stack" novalidate>
       <label for="selfWork">我自己完成的部分 <small>可以简单写，也可以只上传一张手写反思图。</small><textarea id="selfWork" name="selfWork" placeholder="我自己先找到了……"></textarea></label>
       <label for="aiHelp">AI帮助我的部分 <small>例如提示了一个关系、帮我发现一个缺口。</small><textarea id="aiHelp" name="aiHelp" placeholder="AI帮助我……"></textarea></label>
-      <label for="nextTime">下次没有AI，我会先做什么？<textarea id="nextTime" name="nextTime" placeholder="下次我会先……"></textarea></label>
+      <label for="nextTime">下次无 AI 时，我会如何完成类似任务？<textarea id="nextTime" name="nextTime" placeholder="遇到类似的题，我会先……然后……最后……"></textarea></label>
       ${answerComposer("reflection", "text", "手写反思（可选）", "可以把反思写在纸上，用手机相机拍好后上传图片。", "上面三段文字和这一张图片共用一个提交。")}
       <div class="form-actions"><span class="helper">三段文字和图片至少完成一项。</span><button class="primary" type="submit">完成学习</button></div>
     </form>
@@ -908,6 +916,7 @@ function summaryMarkup(summary) {
 
 const OUTCOME_STATUS_LABELS = Object.freeze({
   independent: "独立通过",
+  recognized: "点选正确",
   assisted: "辅助继续",
   pending: "尚未验证",
   review_required: "需老师复核"
@@ -1163,7 +1172,7 @@ function bindMobileFlow() {
 function renderStudent() {
   updateStepper();
   const stage = canonicalStage(state.session?.stage);
-  const titles = { initial_thinking: "先思：整理题目骨架", help: "求助：让卡点变小", judgment: "判别：核验AI建议", transfer: "迁移：换题独立完成", reflection: "反思：把方法带走", completed: "完成：看见自己的推理" };
+  const titles = { initial_thinking: "先思：整理题目骨架", help: "求助：让卡点变小", judgment: "判别：核验AI建议", transfer: "迁移：换题试一步", reflection: "反思：把方法带走", completed: "完成：看见自己的推理" };
   $("#stageTitle").textContent = titles[stage] || "先从一道题开始";
   const shell = $("#studentShell");
   shell?.classList.toggle("has-session", Boolean(state.session));
@@ -1373,6 +1382,11 @@ function rememberFormDraft(key, draft) {
   state.formDrafts[key] = { ...(state.formDrafts[key] || {}), ...draft };
 }
 
+function syncJudgmentReason() {
+  const panel = $("#judgmentWrittenReason");
+  if (panel) panel.hidden = $("#judgmentForm").elements.reasonOptionId.value !== "own";
+}
+
 function restoreFormDrafts() {
   const initial = state.formDrafts.initial;
   if (initial) {
@@ -1396,6 +1410,14 @@ function restoreFormDrafts() {
     const selected = document.querySelector(`#judgmentForm input[name="verdict"][value="${CSS.escape(state.formDrafts.judgment.verdict)}"]`);
     if (selected) selected.checked = true;
   }
+  for (const [stage, field] of [["judgment", "reasonOptionId"], ["transfer", "stepOptionId"]]) {
+    const value = state.formDrafts[stage]?.[field];
+    if (value) {
+      const selected = document.querySelector(`#${stage}Form input[name="${field}"][value="${CSS.escape(value)}"]`);
+      if (selected) selected.checked = true;
+    }
+  }
+  syncJudgmentReason();
   const reflection = state.formDrafts.reflection;
   if (reflection) {
     for (const field of ["selfWork", "aiHelp", "nextTime"]) {
@@ -1613,19 +1635,26 @@ function bindForms() {
       toast(stageAfterTeacher === "help" ? (teacherReply || "已提交给老师，页面会留在求助阶段。") : "已提交给老师。 ");
     } catch (error) { setHelpBusy(form, false); toast(error.message, true); showRequestError(form, "提交教师看板", error, () => button.click()); }
   });
+  $("#judgmentForm")?.addEventListener("change", event => {
+    if (event.target.name === "reasonOptionId") syncJudgmentReason();
+  });
   $("#judgmentForm")?.addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget;
     const beforeStage = canonicalStage(state.session?.stage);
     if (state.imageBusy) return toast("图片还在处理中，请稍候。", true);
     const selected = form.elements.verdict?.value;
+    const reasonOption = form.elements.reasonOptionId?.value;
     const answer = formAnswer(form, "judgment", "reason");
     if (!selected) return toast("请选择合理、不合理或信息不足。", true);
-    if (!hasAnswer(answer)) return toast("请写出判断理由，或上传手写理由。", true);
-    rememberFormDraft("judgment", { text: answer.text, verdict: selected });
+    if (reasonOption === "") return toast("请选择一个理由。", true);
+    const usesChoice = Boolean(reasonOption && reasonOption !== "own");
+    if (!usesChoice && !hasAnswer(answer)) return toast("请写出判断理由，或上传手写理由。", true);
+    rememberFormDraft("judgment", { text: answer.text, verdict: selected, reasonOptionId: reasonOption });
+    const payload = usesChoice ? { verdict: selected, reasonOptionId: reasonOption } : { verdict: selected, reason: answer.text, text: answer.text, imageData: answer.imageData };
     setBusy(form, true, "正在核验判断…");
     try {
-      const result = await api(`/api/session/${encodeURIComponent(state.session.id)}/judgment`, { method: "POST", body: JSON.stringify({ verdict: selected, reason: answer.text, text: answer.text, imageData: answer.imageData }) });
+      const result = await api(`/api/session/${encodeURIComponent(state.session.id)}/judgment`, { method: "POST", body: JSON.stringify(payload) });
       acceptResponse(result); clearAnswerImageIfAdvanced("judgment", beforeStage); renderStudent(); toast(canonicalStage(state.session?.stage) === "judgment" ? "已记录判断，再看看AI反馈。" : "判断已记录，进入迁移题。 ");
     } catch (error) { setBusy(form, false); toast(error.message, true); showRequestError(form, "判别核验", error, () => form.requestSubmit()); }
   });
@@ -1634,13 +1663,16 @@ function bindForms() {
     const form = event.currentTarget;
     const beforeStage = canonicalStage(state.session?.stage);
     if (state.imageBusy) return toast("图片还在处理中，请稍候。", true);
+    const stepOption = form.elements.stepOptionId?.value;
     const answer = formAnswer(form, "transfer", "answer");
-    if (!hasAnswer(answer)) return toast("请至少写出主要推理，或上传手写证明。", true);
-    rememberFormDraft("transfer", { text: answer.text });
-    setBusy(form, true, "正在判断迁移证明…");
+    if (stepOption === "") return toast("请选择一个选项。", true);
+    if (!stepOption && !hasAnswer(answer)) return toast("请写出关键一步，或上传手写步骤。", true);
+    rememberFormDraft("transfer", { text: answer.text, stepOptionId: stepOption });
+    const payload = stepOption ? { stepOptionId: stepOption } : { answer: answer.text, text: answer.text, imageData: answer.imageData };
+    setBusy(form, true, "正在核验这一步…");
     try {
-      const result = await api(`/api/session/${encodeURIComponent(state.session.id)}/transfer`, { method: "POST", body: JSON.stringify({ answer: answer.text, text: answer.text, imageData: answer.imageData }) });
-      acceptResponse(result); clearAnswerImageIfAdvanced("transfer", beforeStage); renderStudent(); toast(canonicalStage(state.session?.stage) === "transfer" ? "已记录，再根据反馈补一次。" : "迁移证明已记录，请完成反思。 ");
+      const result = await api(`/api/session/${encodeURIComponent(state.session.id)}/transfer`, { method: "POST", body: JSON.stringify(payload) });
+      acceptResponse(result); clearAnswerImageIfAdvanced("transfer", beforeStage); renderStudent(); toast(canonicalStage(state.session?.stage) === "transfer" ? "已记录，再看看反馈。" : "关键一步已记录，请完成反思。 ");
     } catch (error) { setBusy(form, false); toast(error.message, true); showRequestError(form, "迁移核验", error, () => form.requestSubmit()); }
   });
   $("#reflectionForm")?.addEventListener("submit", async event => {

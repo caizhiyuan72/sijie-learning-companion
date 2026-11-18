@@ -227,6 +227,8 @@ button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
 .choice-row span { min-height: 48px; display: grid; place-items: center; padding: 8px; border: 1px solid #aec9c5; border-radius: 10px; background: white; text-align: center; }
 .choice-row input:focus-visible + span { outline: 3px solid rgba(13,148,136,.3); outline-offset: 3px; }
 .choice-row input:checked + span { border-color: var(--primary); background: var(--primary-soft); color: var(--primary-dark); box-shadow: inset 0 0 0 1px var(--primary); }
+.stage-choice-row { grid-template-columns: minmax(0, 1fr); }
+.stage-choice-row span { place-items: center start; text-align: left; overflow-wrap: anywhere; }
 .stuck-point-field { margin-top: 2px; }
 .stuck-point-row span { min-height: 56px; color: var(--text); font-size: 14px; }
 .judgment-card, .transfer-task { margin: 20px 0; padding: 20px 22px; border: 1px solid #f4d38d; border-radius: 14px; background: #fffbeb; color: #5f400f; }

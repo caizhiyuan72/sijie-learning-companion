@@ -9,6 +9,23 @@ import {
 } from "../lib/task-schema.mjs";
 import { sampleTask } from "../lib/sample-task.mjs";
 
+test("选择题的显示位置随会话变化，重进同一会话保持一致", () => {
+  const choice = { options: [
+    { id: "option-1", text: "依据一" },
+    { id: "option-2", text: "依据二" },
+    { id: "option-3", text: "依据三" }
+  ], correctOptionId: "option-1" };
+  const task = { judgmentCard: { statement: "判断这一步", reasonChoice: choice }, transferTask: { text: "迁移小问", stepChoice: choice } };
+  const publicView = tail => taskToPublic(task, { stage: "transfer", session: { id: `00000000-0000-4000-8000-${tail}` } });
+  const first = publicView("000000000000");
+  const second = publicView("000001000002");
+  assert.equal(first.judgmentCard.reasonOptions[0].id, "option-1");
+  assert.equal(second.judgmentCard.reasonOptions[2].id, "option-1");
+  assert.equal(second.transferTask.stepOptions[1].id, "option-1");
+  assert.deepEqual(second, publicView("000001000002"));
+  assert.doesNotMatch(JSON.stringify(second), /correctOptionId/);
+});
+
 const safeDiagram = {
   width: 600,
   height: 420,

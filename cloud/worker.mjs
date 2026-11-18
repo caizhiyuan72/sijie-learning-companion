@@ -2,6 +2,7 @@ import { advanceHelpOptions, helpOptionsForSession, resolveHelpSelection } from 
 import { requestPointHint, recordHelpSelection, withHelpRequest } from "../lib/help-request.mjs";
 import { DeepSeekClient } from "../lib/deepseek.mjs";
 import { normalizeProblemAnalysis, taskToPublic } from "../lib/task-schema.mjs";
+import { resolveStageChoice } from "../lib/stage-choice.mjs";
 import { classifyStudentInput, isHelpCompletionSignal, redactPersonalInfo } from "../lib/guardrails.mjs";
 import { summarizeLearningOutcome, publicTaskReview } from "../lib/learning-outcome.mjs";
 import { summarizeSession } from "../lib/teacher-summary.mjs";
@@ -455,11 +456,13 @@ async function handleApi(request, env, store, model, url) {
   }
 
   if (match[2] === "judgment") {
+    assertStage(session, STAGES.JUDGMENT);
     const verdict = cleanText(body.verdict);
-    const judgmentText = [`选择：${verdict}`, `理由：${body.reason || body.text}`].join("\n");
-    const evaluation = await model.evaluateAnswer({ task, session, stage: STAGES.JUDGMENT, kind: "judgment", answer: { text: judgmentText, imageData: body.imageData } });
+    const selected = body.reasonOptionId === undefined ? null : resolveStageChoice(task.judgmentCard?.reasonChoice, body.reasonOptionId, { verdict, correctVerdict: task.judgmentCard?.correctVerdict });
+    const input = selected ? { verdict, reason: selected.text } : body;
+    const evaluation = selected?.evaluation || await model.evaluateAnswer({ task, session, stage: STAGES.JUDGMENT, kind: "judgment", answer: { verdict, reason: body.reason || body.text, imageData: body.imageData } });
     recordKnowledgeReferences(session, evaluation, STAGES.JUDGMENT, "answer_evaluation");
-    submitJudgment(session, body, evaluation);
+    submitJudgment(session, input, evaluation);
     const storedEvaluation = session.answers.judgment.evaluation;
     if (session.stage === STAGES.TRANSFER) { if (storedEvaluation.decision === "assisted") appendExplanation(storedEvaluation, task.judgmentCard.reason); await prepareTransfer(task, session, model, store); }
     await store.saveSession(sanitizeSession(session));
@@ -467,9 +470,12 @@ async function handleApi(request, env, store, model, url) {
   }
 
   if (match[2] === "transfer") {
-    const evaluation = await model.evaluateAnswer({ task, session, stage: STAGES.TRANSFER, kind: "transfer", answer: body });
+    assertStage(session, STAGES.TRANSFER);
+    const selected = task.transferTask?.stepChoice || body.stepOptionId !== undefined ? resolveStageChoice(task.transferTask?.stepChoice, body.stepOptionId) : null;
+    const input = selected ? { answer: selected.text } : body;
+    const evaluation = selected?.evaluation || await model.evaluateAnswer({ task, session, stage: STAGES.TRANSFER, kind: "transfer", answer: body });
     recordKnowledgeReferences(session, evaluation, STAGES.TRANSFER, "answer_evaluation");
-    submitTransfer(session, body, evaluation);
+    submitTransfer(session, input, evaluation);
     const storedEvaluation = session.answers.transfer.evaluation;
     if (session.stage === STAGES.REFLECTION && storedEvaluation.decision === "assisted") appendExplanation(storedEvaluation, task.transferTask.referenceProof || task.transferTask.answerOutline);
     await store.saveSession(sanitizeSession(session));

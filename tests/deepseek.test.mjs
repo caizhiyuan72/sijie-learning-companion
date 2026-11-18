@@ -514,6 +514,53 @@ test("判别建议出现连续多步计算时重新生成一个局部建议", as
   assert.equal(result.judgmentCard.statement, "可以在等式两边同时减去5。");
 });
 
+test("模型生成的题型保留小问与选项，作答核验收到迁移小问", async () => {
+  const requests = [];
+  const client = new DeepSeekClient("", { fetch: async (_url, options) => {
+    const { messages } = JSON.parse(options.body);
+    const prompt = messages[0].content;
+    requests.push(prompt);
+    if (prompt.includes("二次核验器")) return response('{"valid":true}');
+    if (prompt.includes("判别题生成器")) {
+      return response(JSON.stringify({ statement: "减 3 后得到 x＝8。", correctVerdict: "不合理", reason: "左边仍是 2x。", reasonChoice: { options: ["条件不足", "左边仍是 2x", "应当两边乘 2"], correctIndex: 1 } }));
+    }
+    if (prompt.includes("迁移题生成器")) {
+      return response(JSON.stringify({ text: "3x＋2＝14。", focusPrompt: "两边减 2 后得到什么等式？", knowledgePoint: "等式的性质", referenceProof: "3x＝12", answerOutline: "3x＝12", stepChoice: null }));
+    }
+    return response('{"decision":"pass","feedback":"已写出关键一步。"}');
+  }});
+  client.setRuntimeKey("test-only-runtime-key");
+  const task = { grade: "七年级", problemText: "解方程 2x＋3＝11。", proofGoal: "求 x", isMathProblem: true };
+  const { judgmentCard } = await client.generateJudgmentCard({ task });
+  assert.equal(judgmentCard.reasonChoice.correctOptionId, "option-2");
+  const { transferTask } = await client.generateTransferTask({ task });
+  assert.equal(transferTask.focusPrompt, "两边减 2 后得到什么等式？");
+  assert.equal(transferTask.stepChoice, undefined);
+  const result = await client.evaluateAnswer({ task: { ...task, transferTask }, stage: "transfer", kind: "transfer", answer: { text: "3x＝12" } });
+  assert.equal(result.decision, "pass");
+  assert.match(requests[4], /"focusPrompt":"两边减 2 后得到什么等式？"/u);
+});
+
+test("优先使用已核验的小问，旧任务在重新生成失败时可继续", async () => {
+  const recoveryPrompts = [];
+  const client = new DeepSeekClient("", { fetch: async (_url, options) => {
+    const { messages } = JSON.parse(options.body);
+    recoveryPrompts.push(messages.at(-1).content);
+    return response(JSON.stringify(messages[0].content.includes("二次核验器")
+      ? { valid: false, issues: ["新题缺少等式右边的数值"] }
+      : { text: "不完整的变式", focusPrompt: "写出下一步。" }));
+  }});
+  client.setRuntimeKey("test-only-runtime-key");
+  const saved = { text: "3x＋2＝14。", referenceProof: "3x＝12", focusPrompt: "两边减 2 后得到什么等式？" };
+  const task = { isGeometryProof: false, taskReview: { status: "model_checked" }, transferTask: saved };
+  assert.deepEqual((await client.generateTransferTask({ task })).transferTask, saved);
+  assert.equal(recoveryPrompts.length, 0);
+  const legacy = { text: saved.text, referenceProof: saved.referenceProof };
+  assert.deepEqual((await client.generateTransferTask({ task: { ...task, transferTask: legacy } })).transferTask, legacy);
+  assert.equal(recoveryPrompts.length, 4);
+  assert.match(recoveryPrompts[2], /新题缺少等式右边的数值/);
+});
+
 
 test("反思三个独立文字字段进入模型，不再被误当成空作答", async () => {
   const requests = [];
