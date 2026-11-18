@@ -46,6 +46,9 @@ test("摘要保留卡点、教师求助、学生原话、提示和核验追问",
     title: "等腰三角形的证明",
     problemText: "团队制作的模拟题。",
     proofGoal: "证明AD垂直BC",
+    knownFacts: ["AB＝AC", "D 是 BC 的中点"],
+    diagramDescription: "D 在 BC 上，连接 AD。",
+    diagramPath: "/runtime-uploads/private-original.png",
     referenceProof: "不应在精简教师摘要里展示的参考解析"
   };
 
@@ -56,6 +59,9 @@ test("摘要保留卡点、教师求助、学生原话、提示和核验追问",
   assert.equal(summary.needsHelp, true);
   assert.equal(summary.helpRequested, true);
   assert.equal(summary.stuckPoint, "不知道用哪个定理");
+  assert.deepEqual(summary.task.knownFacts, task.knownFacts);
+  assert.equal(summary.task.diagramDescription, task.diagramDescription);
+  assert.equal(summary.task.diagramPath, undefined);
   assert.equal(summary.helpRequests[0].text, "我还是不知道第二步怎么写。");
   assert.deepEqual(summary.hintsGiven.map(item => item.level), [1, 2]);
   assert.equal(summary.hintsGiven[0].student.text, "我先找AD两侧的两个三角形。");

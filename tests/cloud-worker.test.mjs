@@ -213,6 +213,12 @@ test("方程与几何走完五步，分别记录独立作答和点选证据", as
     const completed = await send(`${route}/reflection`, { nextTime: "我会自己检查关键条件并写出依据。" });
     assert.equal(completed.payload.session.stage, "completed");
     assert.equal(completed.payload.session.learningOutcome.status, "recognized");
+    const teacher = await call(worker, env, "/api/teacher/sessions", { headers: { "x-teacher-token": "teacher-secret" } });
+    const evidence = teacher.payload.sessions.find(item => item.sessionId === completed.payload.session.id);
+    assert.match(evidence.task.problemText, /2\+2|2x|ABC/u);
+    assert.deepEqual(evidence.retryNotes.map(({ stage, feedback }) => ({ stage, feedback })), [
+      { stage: "判别", feedback: `未通过的点选：合理 · ${example.reasons[1]}` }
+    ]);
   });
 });
 

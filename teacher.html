@@ -10,7 +10,7 @@
     .teacher-page { min-height: 100vh; background: var(--background); }
     .teacher-topbar { position: static; }
     .teacher-main { width: min(1180px, 100%); margin: 0 auto; padding: clamp(28px, 5vw, 64px) clamp(18px, 4vw, 48px) 72px; }
-    .teacher-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 390px); align-items: end; gap: 28px; margin-bottom: 28px; }
+    .teacher-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 390px); align-items: center; gap: 24px; margin-bottom: 24px; }
     .teacher-intro h1 { margin-top: 8px; font-size: clamp(30px, 4vw, 46px); }
     .teacher-intro p { max-width: 700px; margin: 14px 0 0; color: var(--muted); }
     .teacher-auth { display: grid; gap: 10px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: white; box-shadow: var(--shadow); }
@@ -29,16 +29,35 @@
     .teacher-status.is-error { border-color: #efc2bd; background: var(--danger-soft); color: var(--danger); }
     .teacher-status.is-success { border-color: #b9dfc6; background: #f4fbf6; color: var(--success); }
     .teacher-list { display: grid; gap: 16px; }
-    .teacher-card { padding: clamp(20px, 3vw, 30px); border: 1px solid var(--line); border-radius: var(--radius); background: white; box-shadow: var(--shadow); }
-    .teacher-card.is-attention { border-color: #e9c77f; box-shadow: 0 14px 36px rgba(180, 83, 9, .11); }
+    .teacher-card { padding: clamp(16px, 2.5vw, 24px); border: 1px solid var(--line); border-radius: var(--radius); background: white; }
+    .teacher-card.is-attention { border-inline-start: 4px solid #c18527; }
     .teacher-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
-    .teacher-card-head h3 { font-size: 22px; }
+    .teacher-card-head h3 { font-size: 19px; overflow-wrap: anywhere; }
     .teacher-card-meta { margin: 6px 0 0; color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
-    .teacher-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
-    .teacher-tags span { max-width: 230px; padding: 4px 8px; border-radius: 999px; background: #eef6f3; color: var(--primary-dark); font-size: 11px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .teacher-card-status { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; justify-content: end; color: var(--muted); }
     .teacher-badge { display: inline-flex; align-items: center; min-height: 30px; flex: 0 0 auto; padding: 4px 10px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-dark); font-size: 12px; font-weight: 800; }
     .teacher-badge.is-attention { background: var(--accent-soft); color: #7c4607; }
-    .teacher-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
+    .teacher-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .teacher-problem, .teacher-focus { margin-top: 14px; padding: 13px 15px; border-radius: 12px; background: #f1f7f5; }
+    .teacher-focus { margin-top: 9px; background: #faf8f1; }
+    .teacher-problem h4, .teacher-focus h4 { margin: 0 0 4px; color: var(--primary-dark); font-size: 13px; }
+    .teacher-problem p, .teacher-focus p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .teacher-focus > p:first-of-type { font-weight: 700; }
+    .teacher-focus .teacher-focus-note { margin-top: 7px; color: var(--muted); font-size: 14px; }
+    .teacher-focus-note strong { color: var(--ink); }
+    .teacher-problem-detail { margin-top: 6px; font-size: 13px; }
+    .teacher-problem-detail summary, .teacher-advanced > summary { padding: 5px 0; cursor: pointer; color: var(--primary-dark); font-weight: 700; overflow-wrap: anywhere; }
+    .teacher-problem-detail div p + p { margin-top: 5px; }
+    .teacher-controls { margin-top: 12px; }
+    .teacher-quick-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+    .teacher-quick-filters button[aria-pressed="true"] { background: var(--primary-dark); border-color: var(--primary-dark); color: white; }
+    .teacher-advanced { margin-top: 6px; }
+    .teacher-advanced > summary { font-size: 13px; }
+    .teacher-recurring { margin: 14px 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+    .teacher-recurring h3 { font-size: 15px; }
+    .teacher-recurring ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 8px; list-style: none; padding: 0; margin: 9px 0 0; }
+    .teacher-recurring li { padding: 8px 10px; border-radius: 8px; background: #f1f7f5; font-size: 13px; overflow-wrap: anywhere; }
+    .teacher-recurring small { display: block; color: var(--muted); }
     .teacher-evidence { min-width: 0; padding: 15px 16px; border: 1px solid #dce9e6; border-radius: 13px; background: #f8fbfa; }
     .teacher-evidence.is-wide { grid-column: 1 / -1; }
     .teacher-evidence h4 { margin-bottom: 7px; color: var(--primary-dark); font-size: 14px; }
@@ -54,11 +73,6 @@
     .teacher-hint-level { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--primary-soft); color: var(--primary-dark); font-size: 12px; font-weight: 800; }
     .teacher-hint p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
     .teacher-hint small { display: block; margin: 4px 0 2px; color: var(--muted); font-size: 12px; }
-    .teacher-suggestion { border-color: #efd39a; background: #fffbef; }
-    .teacher-suggestion h4 { color: var(--accent); }
-    .teacher-later-evidence { margin-top: 18px; border: 1px solid #d9e6e3; border-radius: 12px; background: #fbfdfc; }
-    .teacher-later-evidence > summary { min-height: 48px; display: flex; align-items: center; padding: 10px 14px; color: var(--primary-dark); font-weight: 800; cursor: pointer; }
-    .teacher-later-grid { margin: 0; padding: 0 14px 14px; }
     .teacher-status-list { display: grid; gap: 7px; }
     .teacher-status-list > div { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 10px; align-items: baseline; padding-top: 7px; border-top: 1px solid #dce9e6; }
     .teacher-status-list > div:first-child { padding-top: 0; border-top: 0; }
@@ -72,15 +86,17 @@
     .teacher-outcome.is-assisted { border-left-color: #496a9f; background: #f5f8ff; }
     .teacher-outcome.is-review { border-left-color: var(--accent); background: #fffbef; }
     .teacher-outcome strong { color: var(--ink); }
-    .teacher-trace { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; background: #fbfdfc; }
-    .teacher-trace summary { min-height: 48px; display: flex; align-items: center; padding: 10px 14px; color: var(--primary-dark); font-weight: 800; cursor: pointer; }
+    .teacher-trace, .teacher-later-evidence { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; background: #fbfdfc; }
+    .teacher-trace > summary, .teacher-later-evidence > summary { min-height: 42px; padding: 10px 13px; color: var(--primary-dark); font-size: 14px; font-weight: 700; cursor: pointer; }
+    .teacher-later-grid { padding: 0 12px 12px; }
     .teacher-trace-body { display: grid; gap: 9px; padding: 0 14px 14px; }
     .teacher-trace-item { padding: 10px 12px; border-radius: 9px; background: white; }
     .teacher-trace-item strong { color: var(--ink); }
     .teacher-trace-item p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
     .teacher-trace-item small { color: var(--muted); }
     .teacher-note { margin: 18px 0 0; color: var(--muted); font-size: 13px; }
-    .teacher-knowledge { margin-top: 34px; padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--shadow); }
+    .teacher-knowledge { margin-top: 26px; padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: white; }
+    .teacher-knowledge > summary { cursor: pointer; font-weight: 700; color: var(--primary-dark); }
     .teacher-knowledge-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 430px); gap: 16px; margin-top: 14px; }
     .teacher-knowledge-list { display: grid; gap: 9px; align-content: start; }
     .teacher-knowledge-item { padding: 13px 14px; border: 1px solid #dce9e6; border-radius: 11px; background: #f8fbfa; cursor: pointer; text-align: left; }
@@ -108,6 +124,8 @@
       .teacher-auth-row { grid-template-columns: 1fr; }
       .teacher-toolbar, .teacher-card-head { align-items: stretch; flex-direction: column; }
       .teacher-actions button { flex: 1; }
+      .teacher-card-status { justify-content: start; }
+      .teacher-card-head { gap: 8px; }
     }
   </style>
 </head>
@@ -115,7 +133,7 @@
   <header class="topbar teacher-topbar">
     <a class="brand" href="/" aria-label="返回思阶学生端">
       <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32" role="img"><path d="M6 23h6v-5h6v-5h6V7h3v19H6z"/><path d="m8 12 5-5 4 3 7-6" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-      <span><strong>思阶</strong><small>教师关注列表</small></span>
+      <span><strong>思阶</strong><small>教师端</small></span>
     </a>
     <div class="status-pill" id="teacherApiStatus" role="status" aria-live="polite"><span class="status-dot" aria-hidden="true"></span><span>尚未读取学习记录</span></div>
   </header>
@@ -123,9 +141,8 @@
   <main class="teacher-main" id="main">
     <section class="teacher-intro" aria-labelledby="teacherTitle">
       <div>
-        <div class="eyebrow">教师看板</div>
-        <h1 id="teacherTitle">先看谁留下了卡点</h1>
-        <p>这里呈现学生留下的卡点、帮助过程、判别理由、迁移解法和反思，帮助你决定下一句追问。内容来自学习记录，不替教师判断学生。</p>
+        <h1 id="teacherTitle">教师看板</h1>
+        <p>查看学生做的题目、卡住的地方和求助记录。</p>
       </div>
       <form class="teacher-auth" id="teacherAuthForm" novalidate>
         <label for="teacherToken">教师口令 <small>本机可直接查看；远程访问需教师口令</small></label>
@@ -145,11 +162,17 @@
         </div>
         <div class="teacher-actions">
           <button class="secondary small-button" id="refreshSessions" type="button" hidden>刷新</button>
-          <button class="ghost small-button" id="clearTeacherFilters" type="button">清除筛选</button>
           <button class="ghost small-button" id="clearTeacherSession" type="button" hidden>清除口令</button>
         </div>
       </div>
-      <div class="teacher-filters" aria-label="筛选学习记录">
+      <div id="teacherMessage" class="teacher-status" role="status" aria-live="polite">尚未读取学习记录。</div>
+      <div id="teacherControls" class="teacher-controls" hidden>
+        <div class="teacher-quick-filters" aria-label="按关注状态筛选">
+          <button class="secondary small-button" id="teacherAllFilter" type="button" aria-pressed="true">全部</button>
+          <button class="secondary small-button" id="teacherAttentionFilter" type="button" aria-pressed="false">待关注</button>
+        </div>
+        <details class="teacher-advanced"><summary>更多筛选</summary>
+        <div class="teacher-filters" aria-label="筛选学习记录">
         <label class="teacher-filter" for="teacherStageFilter">当前阶段
           <select id="teacherStageFilter"><option value="all">全部阶段</option></select>
         </label>
@@ -159,17 +182,22 @@
         <label class="teacher-filter" for="teacherStuckFilter">卡点
           <select id="teacherStuckFilter"><option value="all">全部卡点</option></select>
         </label>
+        </div>
+        <button class="ghost small-button" id="clearTeacherFilters" type="button">清除筛选</button>
+        </details>
       </div>
-      <div id="teacherMessage" class="teacher-status" role="status" aria-live="polite">尚未读取学习记录。</div>
+      <section class="teacher-recurring" id="teacherRecurring" aria-labelledby="teacherRecurringTitle" hidden>
+        <h3 id="teacherRecurringTitle">多次出现的核验反馈</h3>
+        <ul id="teacherRecurringList"></ul>
+      </section>
       <div id="sessionList" class="teacher-list" aria-live="polite" style="margin-top:14px">
         <div class="teacher-empty-state"><h3>等待教师打开记录</h3><p>点击“查看学习记录”后，这里会显示匿名会话。</p></div>
       </div>
     </section>
 
-    <section class="teacher-knowledge" aria-labelledby="knowledgeTitle">
+    <details class="teacher-knowledge" aria-labelledby="knowledgeTitle"><summary id="knowledgeTitle">知识库维护</summary>
       <div class="teacher-toolbar">
         <div>
-          <h2 id="knowledgeTitle">知识库维护</h2>
           <p>知识卡和教学策略先保存为草稿，教师发布后才会被AI检索；来源和审核状态会保留。</p>
         </div>
         <div class="teacher-actions">
@@ -219,10 +247,10 @@
           <div id="knowledgeHistory" aria-live="polite"></div>
         </form>
       </div>
-    </section>
+    </details>
     <p class="teacher-note">教师看板只显示匿名编号和本题学习证据。判别、迁移和反思均为本轮过程记录，不代表能力或学习效果；若原话或图片无法确认，请结合课堂情况人工复核。</p>
   </main>
 
-  <script type="module" src="/teacher.js?v=20261117-help-options-r2"></script>
+  <script type="module" src="/teacher.js?v=20261118-dashboard"></script>
 </body>
 </html>

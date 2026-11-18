@@ -14,6 +14,15 @@ const DECISION_LABELS = Object.freeze({
   assisted: "在帮助下继续"
 });
 
+const PROBLEM_LABELS = Object.freeze({
+  geometry_proof: "几何证明", geometry: "几何", equation: "方程", inequality: "不等式",
+  word_problem: "应用题", calculation: "计算题", algebra: "代数", function: "函数",
+  statistics: "统计", probability: "概率", math_problem: "数学题"
+});
+
+const TRACE_LABELS = Object.freeze({ point_selection: "点选卡点", hint: "查看提示", teacher_request: "向老师求助", help_check: "理解核验" });
+const DEFAULT_FILTERS = Object.freeze({ attention: "all", stage: "all", problemType: "all", stuckPoint: "all" });
+
 const state = {
   token: "",
   summaries: [],
@@ -21,7 +30,7 @@ const state = {
   loading: false,
   knowledge: [],
   selectedKnowledgeId: "",
-  filters: { stage: "all", problemType: "all", stuckPoint: "all" }
+  filters: { ...DEFAULT_FILTERS }
 };
 
 const $ = selector => document.querySelector(selector);
@@ -40,7 +49,7 @@ function text(value, fallback = "") {
 function dateLabel(value) {
   if (!value) return "时间未记录";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? text(value, "时间未记录") : date.toLocaleString("zh-CN", { dateStyle: "medium", timeStyle: "short" });
+  return Number.isNaN(date.getTime()) ? "时间未记录" : date.toLocaleString("zh-CN", { dateStyle: "medium", timeStyle: "short" });
 }
 
 function summariesFromPayload(payload) {
@@ -60,15 +69,28 @@ function stageKey(value) {
 }
 
 function stageLabel(value) {
-  return STAGE_LABELS[stageKey(value)] || text(value, "未记录阶段");
+  const stage = stageKey(value);
+  return Object.hasOwn(STAGE_LABELS, stage) ? STAGE_LABELS[stage] : "未记录阶段";
 }
 
 function decisionLabel(value) {
-  return DECISION_LABELS[text(value).toLowerCase()] || text(value, "待复核");
+  const decision = text(value).toLowerCase();
+  return Object.hasOwn(DECISION_LABELS, decision) ? DECISION_LABELS[decision] : "待复核";
 }
 
 function topicLabel(summary) {
-  return text(summary?.task?.problemType, "未标注题型");
+  const value = text(summary?.task?.problemType);
+  const key = value.toLowerCase();
+  if (Object.hasOwn(PROBLEM_LABELS, key)) return PROBLEM_LABELS[key];
+  return /\p{Script=Han}/u.test(value) ? value : "其他数学题";
+}
+
+function latestSelection(summary) {
+  return Array.isArray(summary.helpSelections) ? summary.helpSelections.at(-1) : null;
+}
+
+function stuckLabel(summary) {
+  return text(latestSelection(summary)?.label || summary.stuckPoint);
 }
 
 function summaryNeedsAttention(summary) {
@@ -79,6 +101,7 @@ function sortSummaries(summaries) {
   return [...summaries].sort((a, b) => {
     const attention = Number(summaryNeedsAttention(b)) - Number(summaryNeedsAttention(a));
     if (attention) return attention;
+    if (summaryNeedsAttention(a) && Boolean(a.helpRequested) !== Boolean(b.helpRequested)) return Number(Boolean(b.helpRequested)) - Number(Boolean(a.helpRequested));
     const left = Date.parse(a?.updatedAt || a?.createdAt || 0) || 0;
     const right = Date.parse(b?.updatedAt || b?.createdAt || 0) || 0;
     return right - left;
@@ -98,12 +121,10 @@ function requestsMarkup(requests) {
   return list.map((item, index) => `<div class="teacher-request"><small>第${escapeHtml(item.index || index + 1)}次${item.at ? ` · ${escapeHtml(dateLabel(item.at))}` : ""}</small>${item.selectedStuckPoint ? `<p><strong>学生点选的卡点：</strong>${escapeHtml(text(item.selectedStuckPoint.label, "（未记录标签）"))}</p>` : ""}${item.text ? `<p><strong>教师求助原话：</strong>${escapeHtml(text(item.text, item.image ? "（图片求助）" : "（未记录文字）"))}</p>` : (!item.selectedStuckPoint ? `<p>${escapeHtml(text(item.text, item.image ? "（图片求助）" : "（未记录文字）"))}</p>` : "")}${item.stuckPoint ? `<small>记录的卡点：${escapeHtml(item.stuckPoint)}</small>` : ""}</div>`).join("");
 }
 
-function selectionsMarkup(selections, empty = "学生还没有点选具体卡点。", { latestOnly = false } = {}) {
+function selectionsMarkup(selections) {
   const list = Array.isArray(selections) ? selections : [];
-  if (!list.length) return `<p class="teacher-empty">${escapeHtml(empty)}</p>`;
-  const visible = latestOnly ? list.slice(-1) : list;
-  const offset = latestOnly ? list.length - visible.length : 0;
-  return `<ul class="teacher-selection-list">${visible.map((item, index) => `<li><span>${latestOnly ? "当前" : `第${index + 1 + offset}次`}</span><strong>${escapeHtml(text(item.label, "（未记录标签）"))}</strong>${item.at ? `<small>${escapeHtml(dateLabel(item.at))}</small>` : ""}</li>`).join("")}</ul>`;
+  if (!list.length) return `<p class="teacher-empty">学生还没有点选具体卡点。</p>`;
+  return `<ul class="teacher-selection-list">${list.map((item, index) => `<li><span>第${index + 1}次</span><strong>${escapeHtml(text(item.label, "（未记录标签）"))}</strong>${item.at ? `<small>${escapeHtml(dateLabel(item.at))}</small>` : ""}</li>`).join("")}</ul>`;
 }
 
 function hintsMarkup(hints) {
@@ -125,19 +146,20 @@ function quotesMarkup(quotes) {
 }
 
 function traceItemMarkup(item, index) {
-  const label = text(item.type, text(item.stage, "学习记录"));
-  const student = item.student ? quoteMarkup(item.student, "学生") : item.text ? quoteMarkup({ text: item.text, at: item.at }, "学生") : "";
+  const label = Object.hasOwn(TRACE_LABELS, item.type) ? TRACE_LABELS[item.type] : stageLabel(item.stage);
+  const student = item.student ? quoteMarkup(item.student) : item.text ? quoteMarkup({ text: item.text }) : "";
   const reply = item.reply ? quoteMarkup(item.reply, "思阶") : "";
   const stuck = item.stuckPoint ? `<p><strong>卡点：</strong>${escapeHtml(item.stuckPoint)}</p>` : "";
   const selected = item.selectedStuckPoint ? `<p><strong>学生点选的卡点：</strong>${escapeHtml(text(item.selectedStuckPoint.label, "（未记录标签）"))}</p>` : "";
-  const evaluation = item.evaluation?.feedback ? `<p><strong>记录反馈：</strong>${escapeHtml(item.evaluation.feedback)}</p>` : "";
+  const evaluation = evaluationMarkup(item.evaluation);
   return `<div class="teacher-trace-item"><small>${index + 1}. ${escapeHtml(label)}${item.at ? ` · ${escapeHtml(dateLabel(item.at))}` : ""}</small>${selected}${stuck}${student}${reply}${evaluation}</div>`;
 }
 
 function traceMarkup(trace) {
   const list = Array.isArray(trace) ? trace : [];
   if (!list.length) return `<p class="teacher-empty">暂无可展开的先思和求助轨迹。</p>`;
-  return list.map(traceItemMarkup).join("");
+  const dated = list.filter(item => Date.parse(item.at)).sort((left, right) => Date.parse(left.at) - Date.parse(right.at));
+  return [...dated, ...list.filter(item => !Date.parse(item.at))].map(traceItemMarkup).join("");
 }
 
 function helpCheckMarkup(helpCheck) {
@@ -284,53 +306,105 @@ function learningOutcomeMarkup(summary) {
   return `<section class="teacher-evidence teacher-outcome is-${outcome.tone}"><h4>学习结果标记（不等同掌握）</h4><p><strong>${escapeHtml(outcome.label)}</strong></p><p>${escapeHtml(outcome.reason)}</p>${reviewMarkup}${stagesMarkup}</section>`;
 }
 
+function problemMarkup(task = {}) {
+  const statement = text(task.problemText);
+  const hasDetails = statement.length > 160 || task.knownFacts?.length || task.proofGoal || task.diagramDescription;
+  const preview = statement.length > 160 ? `${statement.slice(0, 160)}…` : statement;
+  return `<section class="teacher-problem">
+    <h4>题目</h4><p>${escapeHtml(preview || "这条记录没有题干。")}</p>
+    ${hasDetails ? `<details class="teacher-problem-detail"><summary>查看${statement.length > 160 ? "完整题干和" : ""}题目条件</summary><div>
+      ${statement.length > 160 ? `<p>${escapeHtml(statement)}</p>` : ""}
+      ${task.knownFacts?.length ? `<p><strong>已知条件</strong> ${escapeHtml(text(task.knownFacts))}</p>` : ""}
+      ${task.proofGoal ? `<p><strong>目标</strong> ${escapeHtml(text(task.proofGoal))}</p>` : ""}
+      ${task.diagramDescription ? `<p><strong>图形关系</strong> ${escapeHtml(text(task.diagramDescription))}</p>` : ""}
+    </div></details>` : ""}
+  </section>`;
+}
+
+function retryNotes(summary) {
+  return Array.isArray(summary.retryNotes) ? summary.retryNotes.filter(item => text(item?.feedback) && text(item?.stage)) : [];
+}
+
+function recentRetry(summary) {
+  return [...retryNotes(summary)].sort((left, right) => (Date.parse(left.at) || 0) - (Date.parse(right.at) || 0)).at(-1);
+}
+
+function focusNoteMarkup(label, value) {
+  if (!value) return "";
+  if (value.length <= 140) return `<p class="teacher-focus-note"><strong>${escapeHtml(label)}</strong> ${escapeHtml(value)}</p>`;
+  return `<details class="teacher-focus-note teacher-problem-detail"><summary>${escapeHtml(label)} · ${escapeHtml(value.slice(0, 76))}…</summary><p>${escapeHtml(value)}</p></details>`;
+}
+
+function recurringFeedback(summaries) {
+  const groups = new Map();
+  for (const summary of summaries) {
+    const keys = new Set();
+    for (const item of retryNotes(summary)) {
+      const feedback = text(item.feedback).replace(/\s+/gu, " ");
+      const stage = stageLabel(item.stage);
+      const topic = topicLabel(summary);
+      const key = JSON.stringify([topic, stage, feedback]);
+      if (keys.has(key)) continue;
+      keys.add(key);
+      const group = groups.get(key) || { topic, stage, feedback, count: 0 };
+      group.count++;
+      groups.set(key, group);
+    }
+  }
+  return [...groups.values()].filter(item => item.count >= 2).sort((left, right) => right.count - left.count).slice(0, 3);
+}
+
 function cardMarkup(summary, index) {
   const attention = summaryNeedsAttention(summary);
   const anonymousId = text(summary.anonymousId, `匿名学生${index + 1}`);
   const taskTitle = text(summary.taskTitle || summary.task?.title, "未命名题目");
   const taskType = topicLabel(summary);
-  const knowledgePoints = Array.isArray(summary.task?.knowledgePoints) ? summary.task.knowledgePoints : [];
-  const stuckPoint = text(summary.stuckPoint, "学生尚未选择具体卡点。");
-  const suggested = text(summary.suggestedFollowUp, "请学生指出当前已知条件、目标和已经尝试的下一步。");
+  const stuckPoint = stuckLabel(summary);
+  const request = attention ? text(summary.helpRequests?.at(-1)?.text) : "";
+  const retry = recentRetry(summary);
+  const outcome = learningOutcome(summary);
+  const suggested = attention ? text(summary.suggestedFollowUp) : "";
   const knowledgeReferences = Array.isArray(summary.knowledgeReferences) ? summary.knowledgeReferences : [];
   const helpSelections = Array.isArray(summary.helpSelections) ? summary.helpSelections : [];
+  const trace = Array.isArray(summary.trace) ? summary.trace : [];
   const referenceMarkup = knowledgeReferences.length
-    ? `<section class="teacher-evidence is-wide"><h4>AI调用过的知识依据（仅记录提供过的条目）</h4>${knowledgeReferences.map(item => `<div class="teacher-request"><small>${escapeHtml(text(item.title, item.id || "知识条目"))}${item.version ? ` · v${escapeHtml(item.version)}` : ""}${item.stage ? ` · ${escapeHtml(item.stage)}` : ""}</small><p>${escapeHtml(text(item.reason, "匹配到当前题目或卡点"))}</p></div>`).join("")}</section>`
+    ? `<section class="teacher-evidence is-wide"><h4>引用过的知识卡</h4>${knowledgeReferences.map(item => `<div class="teacher-request"><small>${escapeHtml(text(item.title, "知识条目"))}${item.stage ? ` · ${escapeHtml(stageLabel(item.stage))}` : ""}</small><p>${escapeHtml(text(item.reason, "匹配到当前题目或卡点"))}</p></div>`).join("")}</section>`
     : "";
   return `<article class="teacher-card${attention ? " is-attention" : ""}">
     <header class="teacher-card-head">
-      <div><h3>${escapeHtml(anonymousId)}</h3><p class="teacher-card-meta">${escapeHtml(taskTitle)} · 最近记录：${escapeHtml(dateLabel(summary.updatedAt || summary.createdAt))}</p><div class="teacher-tags"><span>阶段：${escapeHtml(stageLabel(summary.stage))}</span><span>题型：${escapeHtml(taskType)}</span>${knowledgePoints.slice(0, 3).map(item => `<span>${escapeHtml(text(item))}</span>`).join("")}</div></div>
-      <span class="teacher-badge${attention ? " is-attention" : ""}">${attention ? (summary.helpRequested ? "已提交教师求助" : "已留下卡点") : (summary.helpRequested || summary.stuckPoint ? "历史求助记录" : "暂无求助记录")}</span>
+      <div><h3>${escapeHtml(taskTitle)}</h3><p class="teacher-card-meta">${escapeHtml(anonymousId)} · ${escapeHtml(taskType)} · ${escapeHtml(dateLabel(summary.updatedAt || summary.createdAt))}</p></div>
+      <div class="teacher-card-status"><span class="teacher-badge${attention ? " is-attention" : ""}">${escapeHtml(attention ? (summary.helpRequested ? "已向老师求助" : "待关注") : stageLabel(summary.stage))}</span>${attention ? `<small>${escapeHtml(stageLabel(summary.stage))}</small>` : `<small>${escapeHtml(outcome.label)}</small>`}</div>
     </header>
-    <div class="teacher-grid">
+    ${problemMarkup(summary.task)}
+    <section class="teacher-focus"><h4>${latestSelection(summary) ? "学生点选的卡点" : "记录的卡点"}</h4><p>${escapeHtml(stuckPoint || "暂无卡点记录。")}</p>
+      ${focusNoteMarkup(retry ? `${stageLabel(retry.stage)}核验反馈` : "", retry?.feedback)}
+      ${focusNoteMarkup("建议追问", suggested)}
+      ${!stuckPoint ? focusNoteMarkup("求助原话", request) : ""}
+    </section>
+    <details class="teacher-later-evidence"><summary>查看学习结果和作答</summary><div class="teacher-grid teacher-later-grid">
       ${learningOutcomeMarkup(summary)}
-      <section class="teacher-evidence"><h4>具体卡点</h4><p>${escapeHtml(stuckPoint)}</p></section>
-      <section class="teacher-evidence"><h4>学生点选的卡点</h4>${selectionsMarkup(helpSelections, "学生还没有点选具体卡点。", { latestOnly: true })}</section>
-      <section class="teacher-evidence teacher-suggestion"><h4>建议追问</h4><p>${escapeHtml(suggested)}</p></section>
-      <section class="teacher-evidence"><h4>教师求助原话</h4>${requestsMarkup(summary.helpRequests)}</section>
-      <section class="teacher-evidence"><h4>已给提示</h4>${hintsMarkup(summary.hintsGiven)}</section>
-    </div>
-    <details class="teacher-later-evidence" open><summary>后续学习证据（只展示过程记录，不作能力判断）</summary><div class="teacher-grid teacher-later-grid">
       <section class="teacher-evidence"><h4>帮助状态</h4>${helpStatusMarkup(summary.helpStatus)}</section>
       <section class="teacher-evidence"><h4>判别理由</h4>${stageAnswerMarkup(summary.judgment, { label: "判别时学生理由" })}</section>
       <section class="teacher-evidence"><h4>迁移解法</h4>${stageAnswerMarkup(summary.transfer, { label: "迁移时学生解法" })}</section>
       <section class="teacher-evidence"><h4>反思记录</h4>${reflectionMarkup(summary.reflection)}</section>
       ${referenceMarkup}
     </div></details>
-    <details class="teacher-trace"><summary>展开原始轨迹（${Array.isArray(summary.trace) ? summary.trace.length : 0}条）</summary><div class="teacher-trace-body"><h4>学生点选的卡点</h4>${selectionsMarkup(helpSelections)}<h4>学生原话</h4>${quotesMarkup(summary.studentQuotes)}<h4>理解核验记录</h4>${helpCheckMarkup(summary.helpCheck)}<h4>过程轨迹</h4>${traceMarkup(summary.trace)}</div></details>
+    <details class="teacher-trace"><summary>展开原始轨迹${trace.length ? `（${trace.length}条）` : ""}</summary><div class="teacher-trace-body">
+      ${trace.length ? traceMarkup(trace) : `<h4>学生点选的卡点</h4>${selectionsMarkup(helpSelections)}<h4>教师求助原话</h4>${requestsMarkup(summary.helpRequests)}<h4>已给提示</h4>${hintsMarkup(summary.hintsGiven)}<h4>学生原话</h4>${quotesMarkup(summary.studentQuotes)}<h4>理解核验记录</h4>${helpCheckMarkup(summary.helpCheck)}`}</div></details>
   </article>`;
 }
 
 function filterSummaries(summaries, filters = state.filters) {
-  const active = { stage: "all", problemType: "all", stuckPoint: "all", ...(filters || {}) };
+  const active = { ...DEFAULT_FILTERS, ...filters };
   return summaries.filter(summary => {
+    const attentionMatch = active.attention === "all" || summaryNeedsAttention(summary);
     const stageMatch = active.stage === "all" || stageKey(summary.stage) === active.stage;
     const typeMatch = active.problemType === "all" || topicLabel(summary) === active.problemType;
-    const stuckValue = text(summary.stuckPoint);
+    const stuckValue = stuckLabel(summary);
     const stuckMatch = active.stuckPoint === "all"
       || (active.stuckPoint === "__none__" && !stuckValue)
       || stuckValue === active.stuckPoint;
-    return stageMatch && typeMatch && stuckMatch;
+    return attentionMatch && stageMatch && typeMatch && stuckMatch;
   });
 }
 
@@ -349,10 +423,12 @@ function refreshFilterOptions() {
     stageSelect.innerHTML = `<option value="all">全部阶段</option>${stageValues.map(item => `<option value="${item.value}">${item.label}</option>`).join("")}`;
     stageSelect.value = Object.hasOwn(STAGE_LABELS, state.filters.stage) ? state.filters.stage : "all";
   }
-  const typeValues = [...new Set(state.summaries.map(topicLabel).filter(value => value !== "未标注题型"))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  const typeValues = [...new Set(state.summaries.map(topicLabel))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  if (!typeValues.includes(state.filters.problemType)) state.filters.problemType = "all";
   addFilterOptions($("#teacherTypeFilter"), typeValues, "全部题型", state.filters.problemType);
-  const stuckValues = [...new Set(state.summaries.map(summary => text(summary.stuckPoint)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
-  if (state.summaries.some(summary => !text(summary.stuckPoint))) stuckValues.push("__none__");
+  const stuckValues = [...new Set(state.summaries.map(stuckLabel).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+  if (state.summaries.some(summary => !stuckLabel(summary))) stuckValues.push("__none__");
+  if (!stuckValues.includes(state.filters.stuckPoint)) state.filters.stuckPoint = "all";
   const stuckSelect = $("#teacherStuckFilter");
   if (stuckSelect) {
     const labels = stuckValues.map(value => value === "__none__" ? "未选择卡点" : value);
@@ -370,8 +446,21 @@ function renderSummaries() {
   refreshFilterOptions();
   const summaries = filterSummaries(sortSummaries(state.summaries));
   $("#sessionCount").textContent = state.loaded
-    ? `显示${summaries.length} / 共${state.summaries.length}条匿名学习记录${filtersActive() ? "（已筛选）" : "，当前仍在求助阶段的会话排在前面"}。`
+    ? `显示 ${summaries.length} / ${state.summaries.length} 条记录`
     : "点击查看后读取；本机可留空口令。";
+  const attention = $("#teacherAttentionFilter");
+  const all = $("#teacherAllFilter");
+  $("#teacherControls").hidden = !state.loaded;
+  all.textContent = `全部 ${state.summaries.length}`;
+  all.setAttribute("aria-pressed", String(state.filters.attention === "all"));
+  attention.textContent = `待关注 ${state.summaries.filter(summaryNeedsAttention).length}`;
+  attention.setAttribute("aria-pressed", String(state.filters.attention === "needed"));
+  const repeat = recurringFeedback(summaries);
+  const repeatPanel = $("#teacherRecurring");
+  repeatPanel.hidden = !repeat.length;
+  $("#teacherRecurringList").innerHTML = repeat.map(item => `<li><small>${escapeHtml(item.topic)} · ${escapeHtml(item.stage)} · ${item.count} 条记录</small>${item.feedback.length > 140
+    ? `<details class="teacher-problem-detail"><summary>${escapeHtml(item.feedback.slice(0, 76))}…</summary>${escapeHtml(item.feedback)}</details>`
+    : `<span>${escapeHtml(item.feedback)}</span>`}</li>`).join("");
   if (!summaries.length) {
     const filteredEmpty = state.loaded && state.summaries.length && filtersActive();
     list.innerHTML = `<div class="teacher-empty-state"><h3>${filteredEmpty ? "没有符合筛选条件的记录" : state.loaded ? "还没有学习记录" : "等待教师打开记录"}</h3><p>${filteredEmpty ? "可以清除一个筛选条件，再查看全部记录。" : state.loaded ? "学生留下先思或求助记录后，这里会出现摘要。" : "点击“查看学习记录”后，这里会显示匿名会话。"}</p></div>`;
@@ -435,7 +524,7 @@ function clearTeacherSession() {
   state.knowledge = [];
   state.selectedKnowledgeId = "";
   state.loaded = false;
-  state.filters = { stage: "all", problemType: "all", stuckPoint: "all" };
+  state.filters = { ...DEFAULT_FILTERS };
   $("#teacherToken").value = "";
   $("#refreshSessions").hidden = true;
   $("#clearTeacherSession").hidden = true;
@@ -645,6 +734,12 @@ function bindKnowledge() {
 }
 
 function bindFilters() {
+  for (const [selector, attention] of [["#teacherAllFilter", "all"], ["#teacherAttentionFilter", "needed"]]) {
+    $(selector)?.addEventListener("click", () => {
+      state.filters.attention = attention;
+      renderSummaries();
+    });
+  }
   const bindings = [
     ["#teacherStageFilter", "stage"],
     ["#teacherTypeFilter", "problemType"],
@@ -655,7 +750,7 @@ function bindFilters() {
     renderSummaries();
   }));
   $("#clearTeacherFilters")?.addEventListener("click", () => {
-    state.filters = { stage: "all", problemType: "all", stuckPoint: "all" };
+    state.filters = { ...DEFAULT_FILTERS };
     renderSummaries();
   });
 }
@@ -678,4 +773,4 @@ if (typeof document !== "undefined") {
   else init();
 }
 
-export { cardMarkup, filterSummaries, renderSummaries, sortSummaries, stageKey, summaryNeedsAttention };
+export { cardMarkup, filterSummaries, recurringFeedback, renderSummaries, sortSummaries, stageKey, summaryNeedsAttention };
