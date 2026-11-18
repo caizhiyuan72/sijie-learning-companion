@@ -165,6 +165,7 @@ test("紧凑列表支持分页、跨页查看详情和筛选归位", async t => 
   const sessions = Array.from({ length: 25 }, (_, index) => ({
     ...summary(undefined),
     taskTitle: `图形题 ${index + 1}`,
+    username: index === 1 ? "小周" : "小林",
     task: { problemText: "在△ABC 中，AB＝AC。", problemType: "geometry_proof" },
     stuckPoint: "找不到对应角",
     needsHelp: index < 2
@@ -177,6 +178,7 @@ test("紧凑列表支持分页、跨页查看详情和筛选归位", async t => 
   const list = get("sessionList");
   assert.equal(list.innerHTML.match(/data-session-index=/gu).length, 12);
   assert.match(list.innerHTML, /在△ABC 中，AB＝AC。/u);
+  assert.match(list.innerHTML, /teacher-student-name">小周<\/strong>/u);
   assert.doesNotMatch(list.innerHTML, /原始轨迹|查看学习结果/u);
   assert.equal(get("teacherPageNumber").textContent, "第 1 / 3 页");
   list.listeners.click({ target: { closest: () => preview } });
@@ -195,6 +197,9 @@ test("紧凑列表支持分页、跨页查看详情和筛选归位", async t => 
   get("teacherAttentionFilter").listeners.click();
   assert.equal(list.innerHTML.match(/data-session-index=/gu).length, 2);
   assert.equal(get("teacherPagination").hidden, true);
+  get("teacherUsernameFilter").listeners.input({ currentTarget: { value: "周" } });
+  assert.equal(list.innerHTML.match(/data-session-index=/gu).length, 1);
+  assert.match(list.innerHTML, /小周/u);
   get("clearTeacherSession").listeners.click();
   assert.doesNotMatch(list.innerHTML, /图形题/u);
 });

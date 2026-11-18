@@ -113,11 +113,20 @@ test("Cloud Worker API covers recognition, session steps and teacher authenticat
   assert.equal(analyzed.response.status, 200);
   assert.ok(analyzed.payload.draftId);
 
-  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft, problem: analyzed.payload.draft }) });
+  for (const username of [undefined, "  ", "字".repeat(33), { text: "无效" }]) {
+    const rejected = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username, draftId: analyzed.payload.draftId }) });
+    assert.equal(rejected.response.status, 400);
+    assert.equal(rejected.payload.code, "INVALID_USERNAME");
+  }
+  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft, problem: analyzed.payload.draft }) });
   assert.equal(created.response.status, 201);
   assert.equal(created.payload.generation.needsTeacherReview, false);
   assert.equal(created.payload.session.learningOutcome.taskReview.status, "model_checked");
   const sessionId = created.payload.session.id;
+  assert.equal(created.payload.session.username, undefined);
+  const resumed = await call(worker, env, `/api/session/${sessionId}`);
+  assert.equal(resumed.response.status, 200);
+  assert.doesNotMatch(JSON.stringify(resumed.payload), /验收学生/u);
 
   const initial = await call(worker, env, `/api/session/${sessionId}/initial`, { method: "POST", body: JSON.stringify({ known: "2", goal: "求和", text: "2+2" }) });
   assert.equal(initial.response.status, 200);
@@ -137,6 +146,7 @@ test("Cloud Worker API covers recognition, session steps and teacher authenticat
   const teacher = await call(worker, env, "/api/teacher/sessions", { headers: { "x-teacher-token": "teacher-secret" } });
   assert.equal(teacher.response.status, 200);
   assert.equal(teacher.payload.sessions.length, 1);
+  assert.equal(teacher.payload.sessions[0].username, "验收学生");
 });
 
 test("方程与几何走完五步，分别记录独立作答和点选证据", async t => {
@@ -179,7 +189,7 @@ test("方程与几何走完五步，分别记录独立作答和点选证据", as
     const { worker, env } = setup({ model });
     const send = (path, body) => call(worker, env, path, { method: "POST", body: JSON.stringify(body) });
     const analyzed = await send("/api/problem/analyze", { grade: "八年级", problemText: example.original });
-    const created = await send("/api/session", { draftId: analyzed.payload.draftId, draft: analyzed.payload.draft });
+    const created = await send("/api/session", { username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft });
     assert.equal(created.response.status, 201);
     const route = `/api/session/${created.payload.session.id}`;
     await send(`${route}/initial`, { text: "先整理已知条件和目标" });
@@ -228,7 +238,7 @@ test("Cloud Worker marks a structure-only task for teacher review without callin
   }
   const { worker, env } = setup({ model: new StructureOnlyModel() });
   const analyzed = await call(worker, env, "/api/problem/analyze", { method: "POST", body: JSON.stringify({ grade: "八年级", problemText: "2+2=？" }) });
-  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
+  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
   assert.equal(created.response.status, 201);
   assert.equal(created.payload.generation.verified, false);
   assert.equal(created.payload.generation.needsTeacherReview, true);
@@ -245,7 +255,7 @@ test("Cloud Worker hides verifier review markers from students but keeps them in
   }
   const { worker, env } = setup({ model: new MarkerModel() });
   const analyzed = await call(worker, env, "/api/problem/analyze", { method: "POST", body: JSON.stringify({ grade: "八年级", problemText: "2+2=？" }) });
-  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
+  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
   assert.equal(created.response.status, 201);
   const studentPayload = JSON.stringify(created.payload);
   assert.equal(studentPayload.includes(marker), false);
@@ -303,13 +313,13 @@ test("Cloud Worker teacher knowledge API supports draft, publish, disable and pr
   assert.equal(disabled.payload.item.status, "disabled");
 
   const analyzed = await call(worker, env, "/api/problem/analyze", { method: "POST", body: JSON.stringify({ grade: "八年级", problemText: "策略测试：2+2=？" }) });
-  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft, problem: analyzed.payload.draft }) });
+  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft, problem: analyzed.payload.draft }) });
   assert.equal(created.response.status, 201);
   assert.equal(Object.hasOwn(created.payload.task, "_knowledgeBundle"), false);
   assert.equal(Object.hasOwn(created.payload.task, "strategies"), false);
   assert.equal(Object.hasOwn(created.payload.session, "knowledgeReferences"), false);
 
-  const corrected = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ confirmed: true, analysis: { grade: "八年级", subject: "初中数学", problemType: "word_problem", isMathProblem: true, isGeometryProof: false, title: "人工修正题", problemText: "人工修正题：2+2=？", proofGoal: "求出结果", knownFacts: ["2"], needsClarification: true, clarification: "原识别稿不清楚" }, draft: { problemText: "人工修正题：2+2=？", goal: "求出结果" } }) });
+  const corrected = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", confirmed: true, analysis: { grade: "八年级", subject: "初中数学", problemType: "word_problem", isMathProblem: true, isGeometryProof: false, title: "人工修正题", problemText: "人工修正题：2+2=？", proofGoal: "求出结果", knownFacts: ["2"], needsClarification: true, clarification: "原识别稿不清楚" }, draft: { problemText: "人工修正题：2+2=？", goal: "求出结果" } }) });
   assert.equal(corrected.response.status, 201);
 });
 
@@ -324,7 +334,7 @@ test("反思图片看不清保持第五阶段，补充文字后完成且不编�
   }
   const { worker, env } = setup({ model: new ReflectionModel() });
   const analyzed = await call(worker, env, "/api/problem/analyze", { method: "POST", body: JSON.stringify({ grade: "八年级", problemText: "2+2=？" }) });
-  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
+  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
   const prefix = `/api/session/${created.payload.session.id}`;
   for (const [step, body] of [["initial", { known: "2", goal: "求和" }], ["help", { action: "understood" }], ["judgment", { verdict: "合理", reason: "条件足够" }], ["transfer", { text: "按同一方法完成" }]]) await call(worker, env, `${prefix}/${step}`, { method: "POST", body: JSON.stringify(body) });
   const blurry = await call(worker, env, `${prefix}/reflection`, { method: "POST", body: JSON.stringify({ imageData: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=" }) });
@@ -356,7 +366,7 @@ test("Cloud Worker point selection requests hints without evaluating understandi
   const model = new PointModel();
   const { worker, env } = setup({ model });
   const analyzed = await call(worker, env, "/api/problem/analyze", { method: "POST", body: JSON.stringify({ problemText: "2+2=？" }) });
-  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
+  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
   assert.equal(created.payload.task.helpOptions, undefined, "先思不能公开卡点");
   const endpoint = `/api/session/${created.payload.session.id}`;
   const initial = await call(worker, env, `${endpoint}/initial`, { method: "POST", body: JSON.stringify({ stuckPoint: "不知道从哪里开始" }) });
@@ -431,7 +441,7 @@ test("Cloud Worker rejects overlapping help requests and releases the lock after
   }
   const { worker, env } = setup({ model: new SlowModel() });
   const analyzed = await call(worker, env, "/api/problem/analyze", { method: "POST", body: JSON.stringify({ problemText: "2+2=？" }) });
-  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
+  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
   const endpoint = `/api/session/${created.payload.session.id}`;
   const initial = await call(worker, env, `${endpoint}/initial`, { method: "POST", body: JSON.stringify({ stuckPoint: "不知道从哪里开始" }) });
   const body = { action: "hint", selectedStuckPointId: helpPicker(initial.payload).options[0].id };
@@ -461,8 +471,8 @@ test("Cloud Worker keeps help option rounds isolated between sessions sharing on
   }
   const { worker, env, state } = setup({ model: new RoundModel() });
   const analyzed = await call(worker, env, "/api/problem/analyze", { method: "POST", body: JSON.stringify({ problemText: "2+2=？" }) });
-  const first = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
-  const second = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
+  const first = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
+  const second = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
   const secondSession = state.sessions.get(second.payload.session.id);
   secondSession.taskId = first.payload.task.id;
   state.sessions.set(second.payload.session.id, secondSession);
@@ -491,7 +501,7 @@ test("Cloud Worker explicit hint with only text never evaluates it as an underst
   const model = new TextHintModel();
   const { worker, env } = setup({ model });
   const analyzed = await call(worker, env, "/api/problem/analyze", { method: "POST", body: JSON.stringify({ problemText: "2+2=？" }) });
-  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
+  const created = await call(worker, env, "/api/session", { method: "POST", body: JSON.stringify({ username: "验收学生", draftId: analyzed.payload.draftId, draft: analyzed.payload.draft }) });
   const endpoint = `/api/session/${created.payload.session.id}`;
   await call(worker, env, `${endpoint}/initial`, { method: "POST", body: JSON.stringify({ stuckPoint: "不知道从哪里开始" }) });
   const hint = await call(worker, env, `${endpoint}/help`, { method: "POST", body: JSON.stringify({ action: "hint", text: "我想知道题目中的中点是什么意思" }) });

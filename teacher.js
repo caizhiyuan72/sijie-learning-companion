@@ -21,7 +21,7 @@ const PROBLEM_LABELS = Object.freeze({
 });
 
 const TRACE_LABELS = Object.freeze({ point_selection: "点选卡点", hint: "查看提示", teacher_request: "向老师求助", help_check: "理解核验" });
-const DEFAULT_FILTERS = Object.freeze({ attention: "all", stage: "all", problemType: "all", stuckPoint: "all" });
+const DEFAULT_FILTERS = Object.freeze({ attention: "all", stage: "all", problemType: "all", stuckPoint: "all", username: "" });
 const SESSIONS_PER_PAGE = 12;
 
 const state = {
@@ -360,7 +360,7 @@ function recurringFeedback(summaries) {
 
 function sessionPreviewMarkup(summary, index) {
   const title = text(summary.taskTitle || summary.task?.title, "未命名题目");
-  const student = text(summary.anonymousId, `匿名学生${index + 1}`);
+  const student = text(summary.username, text(summary.anonymousId, "旧记录"));
   const attention = summaryNeedsAttention(summary);
   const stage = stageLabel(summary.stage);
   const status = attention ? (summary.helpRequested ? "向老师求助" : "待关注") : stage;
@@ -368,7 +368,7 @@ function sessionPreviewMarkup(summary, index) {
   const stuck = stuckLabel(summary);
   return `<button class="teacher-preview${attention ? " is-attention" : ""}" type="button" data-session-index="${index}" aria-haspopup="dialog">
     <span class="teacher-preview-head"><strong class="teacher-preview-title">${escapeHtml(title)}</strong><span class="teacher-badge${attention ? " is-attention" : ""}">${escapeHtml(status)}</span></span>
-    <span class="teacher-preview-meta">${escapeHtml(student)} · ${escapeHtml(topicLabel(summary))}</span>
+    <span class="teacher-preview-meta"><strong class="teacher-student-name">${escapeHtml(student)}</strong> · ${escapeHtml(topicLabel(summary))}</span>
     ${problem && problem !== title ? `<span class="teacher-preview-problem">${escapeHtml(problem)}</span>` : ""}
     <span class="teacher-preview-stuck">${stuck ? `<strong>卡点</strong> ${escapeHtml(stuck)}` : "暂无卡点记录"}</span>
   </button>`;
@@ -376,7 +376,7 @@ function sessionPreviewMarkup(summary, index) {
 
 function cardMarkup(summary, index) {
   const attention = summaryNeedsAttention(summary);
-  const anonymousId = text(summary.anonymousId, `匿名学生${index + 1}`);
+  const student = text(summary.username, text(summary.anonymousId, "旧记录"));
   const taskTitle = text(summary.taskTitle || summary.task?.title, "未命名题目");
   const taskType = topicLabel(summary);
   const stuckPoint = stuckLabel(summary);
@@ -392,7 +392,7 @@ function cardMarkup(summary, index) {
     : "";
   return `<article class="teacher-card${attention ? " is-attention" : ""}">
     <header class="teacher-card-head">
-      <div><h3>${escapeHtml(taskTitle)}</h3><p class="teacher-card-meta">${escapeHtml(anonymousId)} · ${escapeHtml(taskType)} · ${escapeHtml(dateLabel(summary.updatedAt || summary.createdAt))}</p></div>
+      <div><h3>${escapeHtml(taskTitle)}</h3><p class="teacher-card-meta"><strong class="teacher-student-name">${escapeHtml(student)}</strong> · ${escapeHtml(taskType)} · ${escapeHtml(dateLabel(summary.updatedAt || summary.createdAt))}</p></div>
       <div class="teacher-card-status"><span class="teacher-badge${attention ? " is-attention" : ""}">${escapeHtml(attention ? (summary.helpRequested ? "已向老师求助" : "待关注") : stageLabel(summary.stage))}</span>${attention ? `<small>${escapeHtml(stageLabel(summary.stage))}</small>` : `<small>${escapeHtml(outcome.label)}</small>`}</div>
     </header>
     ${problemMarkup(summary.task)}
@@ -416,6 +416,7 @@ function cardMarkup(summary, index) {
 
 function filterSummaries(summaries, filters = state.filters) {
   const active = { ...DEFAULT_FILTERS, ...filters };
+  const username = text(active.username).normalize("NFC").toLowerCase();
   return summaries.filter(summary => {
     const attentionMatch = active.attention === "all" || summaryNeedsAttention(summary);
     const stageMatch = active.stage === "all" || stageKey(summary.stage) === active.stage;
@@ -424,7 +425,7 @@ function filterSummaries(summaries, filters = state.filters) {
     const stuckMatch = active.stuckPoint === "all"
       || (active.stuckPoint === "__none__" && !stuckValue)
       || stuckValue === active.stuckPoint;
-    return attentionMatch && stageMatch && typeMatch && stuckMatch;
+    return attentionMatch && stageMatch && typeMatch && stuckMatch && (!username || text(summary.username).toLowerCase().includes(username));
   });
 }
 
@@ -437,6 +438,7 @@ function addFilterOptions(select, values, allLabel, current) {
 }
 
 function refreshFilterOptions() {
+  $("#teacherUsernameFilter").value = state.filters.username;
   const stageValues = Object.entries(STAGE_LABELS).map(([value, label]) => ({ value, label }));
   const stageSelect = $("#teacherStageFilter");
   if (stageSelect) {
@@ -458,7 +460,7 @@ function refreshFilterOptions() {
 }
 
 function filtersActive() {
-  return Object.values(state.filters).some(value => value !== "all");
+  return Object.keys(DEFAULT_FILTERS).some(key => state.filters[key] !== DEFAULT_FILTERS[key]);
 }
 
 function renderSessionPage() {
@@ -471,14 +473,14 @@ function renderSessionPage() {
   const range = end ? `第 ${start + 1}–${end} 条` : "0 条记录";
   $("#sessionCount").textContent = state.loaded
     ? `${range} / 共 ${summaries.length} 条${filtersActive() ? `（筛选前 ${state.summaries.length} 条）` : ""}`
-    : "点击查看后读取；本机可留空口令。";
+    : "";
   $("#teacherPagination").hidden = pageCount < 2;
   $("#teacherPageNumber").textContent = `第 ${state.page + 1} / ${pageCount} 页`;
   $("#teacherPrevPage").disabled = state.page === 0;
   $("#teacherNextPage").disabled = state.page >= pageCount - 1;
   if (!summaries.length) {
     const filteredEmpty = state.loaded && state.summaries.length && filtersActive();
-    list.innerHTML = `<div class="teacher-empty-state"><h3>${filteredEmpty ? "没有符合筛选条件的记录" : state.loaded ? "还没有学习记录" : "等待教师打开记录"}</h3><p>${filteredEmpty ? "可以清除一个筛选条件，再查看全部记录。" : state.loaded ? "学生留下先思或求助记录后，这里会出现摘要。" : "点击“查看学习记录”后，这里会显示匿名会话。"}</p></div>`;
+    list.innerHTML = `<div class="teacher-empty-state"><h3>${filteredEmpty ? "没有符合条件的记录" : "暂无学习记录"}</h3></div>`;
     return;
   }
   list.innerHTML = summaries.slice(start, end).map((summary, index) => sessionPreviewMarkup(summary, start + index)).join("");
@@ -825,6 +827,11 @@ function bindKnowledge() {
 }
 
 function bindFilters() {
+  $("#teacherUsernameFilter").addEventListener("input", event => {
+    state.filters.username = event.currentTarget.value;
+    state.page = 0;
+    renderSummaries();
+  });
   for (const [selector, attention] of [["#teacherAllFilter", "all"], ["#teacherAttentionFilter", "needed"]]) {
     $(selector)?.addEventListener("click", () => {
       state.filters.attention = attention;

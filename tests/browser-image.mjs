@@ -250,6 +250,7 @@ async function main() {
       await page.fill("#problemTextInput", "2x=4");
       await page.click("#problemForm button[type=submit]");
       await page.waitForSelector("#draftForm");
+      await page.fill("#studentUsername", "验收学生");
       await page.click("#draftForm button[type=submit]");
       await page.waitForSelector("#initialForm");
       await page.fill("#initialKnown", "2x=4");
@@ -276,6 +277,7 @@ async function main() {
       await page.fill("#problemTextInput", "2x=4");
       await page.click("#problemForm button[type=submit]");
       await page.waitForSelector("#draftForm");
+      await page.fill("#studentUsername", "验收学生");
       await page.click("#draftForm button[type=submit]");
       await page.waitForSelector("#initialForm");
       assert.notEqual(await page.locator("#initial-answer-preview").getAttribute("hidden"), null, "原题图不能出现在先思作答图片中");

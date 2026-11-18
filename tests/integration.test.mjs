@@ -542,6 +542,7 @@ async function createConfirmedSession() {
   const created = await request("/api/session", {
     method: "POST",
     body: JSON.stringify({
+      username: "验收学生",
       confirmed: true,
       grade: problem.grade || "八年级",
       problem,
@@ -553,6 +554,7 @@ async function createConfirmedSession() {
   });
   assert.equal(created.response.status, 201);
   assert.ok(created.body.session?.id);
+  assert.equal(created.body.session.username, undefined);
   assert.equal(created.body.session.taskReview.status, "model_checked");
   assert.equal(created.body.session.taskReview.needsTeacherReview, false);
   assert.equal(created.body.session.learningOutcome.flowCompleted, false);
@@ -629,6 +631,7 @@ test("普通数学题可以识别并进入四步学习流程", async () => {
   const created = await request("/api/session", {
     method: "POST",
     body: JSON.stringify({
+      username: "验收学生",
       draftId: analyzed.body.draftId,
       confirmed: true,
       problem: analyzed.body.analysis,
@@ -659,7 +662,7 @@ test("求助阶段明显套用三角形面积公式时不能被宽松模型直�
   });
   const created = await request("/api/session", {
     method: "POST",
-    body: JSON.stringify({ draftId: analyzed.body.draftId, confirmed: true, problem: analyzed.body.analysis, grade: "八年级" })
+    body: JSON.stringify({ username: "验收学生", draftId: analyzed.body.draftId, confirmed: true, problem: analyzed.body.analysis, grade: "八年级" })
   });
   const initial = await request(`/api/session/${created.body.session.id}/initial`, {
     method: "POST",
@@ -722,7 +725,7 @@ test("非几何证明题会被识别并阻止建立会话", async () => {
   assert.match(JSON.stringify(analyzed.body), /不是初中几何证明题|几何证明题/);
   const created = await request("/api/session", {
     method: "POST",
-    body: JSON.stringify({ confirmed: true, problem: analyzed.body.analysis })
+    body: JSON.stringify({ username: "验收学生", confirmed: true, problem: analyzed.body.analysis })
   });
   assert.equal(created.response.status, 422);
   assert.equal(responseDecision(created.body), "clearer_input");
@@ -1148,4 +1151,5 @@ test("本地服务支持无文字点选卡点、换点及仅点选提交教师�
   const summary = await request("/api/teacher/sessions", { headers: { "x-teacher-token": "test-teacher-token" } });
   assert.equal(summary.response.status, 200);
   assert.ok(JSON.stringify(summary.body).includes(round3.options[0].label));
+  assert.equal(summary.body.sessions.find(item => item.sessionId === id)?.username, "验收学生");
 });

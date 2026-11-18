@@ -12,7 +12,6 @@
     .teacher-main { width: min(1440px, 100%); margin: 0 auto; padding: clamp(20px, 3vw, 44px) clamp(14px, 3vw, 42px) 56px; }
     .teacher-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 390px); align-items: center; gap: 24px; margin-bottom: 24px; }
     .teacher-intro h1 { margin-top: 8px; font-size: clamp(30px, 4vw, 46px); }
-    .teacher-intro p { max-width: 700px; margin: 14px 0 0; color: var(--muted); }
     .teacher-auth { display: grid; gap: 10px; padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: white; box-shadow: var(--shadow); }
     .teacher-auth label { gap: 6px; }
     .teacher-auth small { color: var(--muted); font-weight: 400; }
@@ -39,6 +38,7 @@
     .teacher-preview-title { font-size: 16px; line-height: 1.45; -webkit-line-clamp: 1; }
     .teacher-preview .teacher-badge { min-height: 22px; padding: 2px 7px; font-size: 11px; white-space: nowrap; }
     .teacher-preview-meta { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .teacher-student-name { color: var(--primary-dark); }
     .teacher-preview-problem { grid-row: 3; -webkit-line-clamp: 2; align-self: start; color: var(--muted); font-size: 13px; line-height: 1.5; }
     .teacher-preview-stuck { grid-row: 4; padding-top: 5px; border-top: 1px solid var(--line); font-size: 13px; line-height: 1.5; -webkit-line-clamp: 1; }
     .teacher-preview-stuck strong { margin-inline-end: 3px; color: var(--primary-dark); }
@@ -74,6 +74,7 @@
     .teacher-problem-detail div p + p { margin-top: 5px; }
     .teacher-controls { margin-top: 12px; }
     .teacher-quick-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+    .teacher-quick-filters input { width: min(100%, 220px); }
     .teacher-quick-filters button[aria-pressed="true"] { background: var(--primary-dark); border-color: var(--primary-dark); color: white; }
     .teacher-advanced { margin-top: 6px; }
     .teacher-advanced > summary { font-size: 13px; }
@@ -118,7 +119,6 @@
     .teacher-trace-item strong { color: var(--ink); }
     .teacher-trace-item p { margin: 3px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
     .teacher-trace-item small { color: var(--muted); }
-    .teacher-note { margin: 18px 0 0; color: var(--muted); font-size: 13px; }
     .teacher-knowledge { margin-top: 26px; padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: white; }
     .teacher-knowledge > summary { cursor: pointer; font-weight: 700; color: var(--primary-dark); }
     .teacher-knowledge-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 430px); gap: 16px; margin-top: 14px; }
@@ -174,10 +174,9 @@
     <section class="teacher-intro" aria-labelledby="teacherTitle">
       <div>
         <h1 id="teacherTitle">教师看板</h1>
-        <p>查看学生做的题目、卡住的地方和求助记录。</p>
       </div>
       <form class="teacher-auth" id="teacherAuthForm" novalidate>
-        <label for="teacherToken">教师口令 <small>本机可直接查看；远程访问需教师口令</small></label>
+        <label for="teacherToken">教师口令</label>
         <div class="teacher-auth-row">
           <input id="teacherToken" name="teacherToken" type="password" autocomplete="current-password" placeholder="本机可留空" aria-describedby="teacherMessage">
           <button class="ghost teacher-token-toggle" id="teacherTokenToggle" type="button" aria-controls="teacherToken" aria-pressed="false">显示</button>
@@ -190,7 +189,7 @@
       <div class="teacher-toolbar">
         <div>
           <h2 id="sessionListTitle" tabindex="-1">学习记录</h2>
-          <p id="sessionCount">点击查看后读取；本机可留空口令。</p>
+          <p id="sessionCount"></p>
         </div>
         <div class="teacher-actions">
           <button class="secondary small-button" id="refreshSessions" type="button" hidden>刷新</button>
@@ -202,6 +201,7 @@
         <div class="teacher-quick-filters" aria-label="按关注状态筛选">
           <button class="secondary small-button" id="teacherAllFilter" type="button" aria-pressed="true">全部</button>
           <button class="secondary small-button" id="teacherAttentionFilter" type="button" aria-pressed="false">待关注</button>
+          <input id="teacherUsernameFilter" type="search" aria-label="按用户名筛选" placeholder="搜用户名" maxlength="32" autocomplete="off">
         </div>
         <details class="teacher-advanced"><summary>更多筛选</summary>
         <div class="teacher-filters" aria-label="筛选学习记录">
@@ -223,7 +223,7 @@
         <ul id="teacherRecurringList"></ul>
       </section>
       <div id="sessionList" class="teacher-list" aria-live="polite">
-        <div class="teacher-empty-state"><h3>等待教师打开记录</h3><p>点击“查看学习记录”后，这里会显示匿名会话。</p></div>
+        <div class="teacher-empty-state"><h3>暂无学习记录</h3></div>
       </div>
       <nav class="teacher-pagination" id="teacherPagination" aria-label="学习记录分页" hidden>
         <button class="ghost small-button" id="teacherPrevPage" type="button">上一页</button>
@@ -246,9 +246,6 @@
 
     <details class="teacher-knowledge" aria-labelledby="knowledgeTitle"><summary id="knowledgeTitle">知识库维护</summary>
       <div class="teacher-toolbar">
-        <div>
-          <p>知识卡和教学策略先保存为草稿，教师发布后才会被AI检索；来源和审核状态会保留。</p>
-        </div>
         <div class="teacher-actions">
           <button class="secondary small-button" id="loadKnowledge" type="button">读取知识库</button>
           <button class="ghost small-button" id="newKnowledge" type="button">新建草稿</button>
@@ -259,25 +256,25 @@
         <div id="knowledgeList" class="teacher-knowledge-list"><p class="teacher-empty">尚未读取知识库。</p></div>
         <form id="knowledgeForm" class="teacher-knowledge-form" hidden novalidate>
           <input type="hidden" id="knowledgeId" name="id"><input type="hidden" id="knowledgeVersion" name="expectedVersion">
-          <label for="knowledgeTitleInput">标题 <small>例如：比例的基本关系</small></label>
+          <label for="knowledgeTitleInput">标题</label>
           <input id="knowledgeTitleInput" name="title" required>
           <label for="knowledgeKind">类型</label>
           <select id="knowledgeKind" name="kind"><option value="math">数学知识卡</option><option value="strategy">教学策略卡</option></select>
-          <label for="knowledgeGrades">适用年级 <small>可填七年级、八年级、九年级；留空表示初中通用</small></label>
+          <label for="knowledgeGrades">适用年级</label>
           <input id="knowledgeGrades" name="gradeRange" placeholder="七年级, 八年级">
-          <label for="knowledgeAliases">知识点别名 <small>用逗号分隔</small></label>
+          <label for="knowledgeAliases">知识点别名（逗号分隔）</label>
           <input id="knowledgeAliases" name="aliases" placeholder="例如：等式变形, 解方程">
-          <label for="knowledgeKeywords">关键词 / 别名 <small>用逗号分隔</small></label>
+          <label for="knowledgeKeywords">关键词（逗号分隔）</label>
           <input id="knowledgeKeywords" name="keywords">
           <label for="knowledgePrinciple">原理</label>
           <textarea id="knowledgePrinciple" name="principle" rows="3" required></textarea>
-          <label for="knowledgeConditions">适用条件 <small>一行一个</small></label>
+          <label for="knowledgeConditions">适用条件（一行一个）</label>
           <textarea id="knowledgeConditions" name="requiredConditions" rows="3"></textarea>
           <label for="knowledgeAvoid">常见误用 / 不适用情况</label>
           <textarea id="knowledgeAvoid" name="avoidWhen" rows="3"></textarea>
           <label for="knowledgeQuestion">引导问题</label>
           <textarea id="knowledgeQuestion" name="question" rows="2"></textarea>
-          <fieldset class="teacher-knowledge-strategy"><legend>教学策略（可选）<small>不同阶段只写一个教学动作，不写完整解答。</small></legend>
+          <fieldset class="teacher-knowledge-strategy"><legend>教学策略（可选）</legend>
             <label for="strategyHelp">求助 / 通用提示</label><textarea id="strategyHelp" name="strategyHelp" rows="2"></textarea>
             <label for="strategyHint1">一级提示</label><textarea id="strategyHint1" name="strategyHint1" rows="2"></textarea>
             <label for="strategyHint2">二级提示</label><textarea id="strategyHint2" name="strategyHint2" rows="2"></textarea>
@@ -288,18 +285,17 @@
           </fieldset>
           <label for="knowledgeSource">来源说明</label>
           <input id="knowledgeSource" name="source" placeholder="项目整理，待教师复核">
-          <label for="knowledgeSourceUrl">来源链接 <small>填写能核对内容的教材章节或原始资料地址</small></label>
+          <label for="knowledgeSourceUrl">来源链接</label>
           <input id="knowledgeSourceUrl" name="sourceUrl" type="url" placeholder="https://…">
-          <label for="knowledgeReview">教师复核状态 <small>只有实际完成数学内容复核后才选择“已教师复核”</small></label>
+          <label for="knowledgeReview">教师复核状态</label>
           <select id="knowledgeReview" name="reviewStatus"><option value="pending_teacher_review">待教师复核</option><option value="teacher_reviewed">已教师复核</option></select>
           <div class="teacher-actions"><button class="primary" type="submit">保存草稿</button><button class="secondary" id="publishKnowledge" type="button">发布当前版本</button><button class="ghost" id="disableKnowledge" type="button">停用</button><button class="ghost" id="knowledgeHistoryButton" type="button">查看版本历史</button></div>
           <div id="knowledgeHistory" aria-live="polite"></div>
         </form>
       </div>
     </details>
-    <p class="teacher-note">教师看板只显示匿名编号和本题学习证据。判别、迁移和反思均为本轮过程记录，不代表能力或学习效果；若原话或图片无法确认，请结合课堂情况人工复核。</p>
   </main>
 
-  <script type="module" src="/teacher.js?v=20261118-compact"></script>
+  <script type="module" src="/teacher.js?v=20261118-usernames"></script>
 </body>
 </html>

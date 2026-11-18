@@ -3,6 +3,7 @@ const state = {
   session: null,
   draft: null,
   draftId: "",
+  username: "",
   grade: "",
   problemImage: null,
   answerImages: {},
@@ -419,10 +420,10 @@ function imagePickerMarkup(key, { problem = false } = {}) {
   </div>`;
 }
 
-function answerComposer(key, textName, label, placeholder, helper = "文字和图片任选其一，也可以同时提交。") {
+function answerComposer(key, textName, label, placeholder = "") {
   const textId = `${key}-answer-text`;
   return `<div class="answer-composer" data-answer-key="${escapeHtml(key)}">
-    <label for="${textId}">${escapeHtml(label)} <small>${escapeHtml(helper)}</small></label>
+    <label for="${textId}">${escapeHtml(label)}</label>
     <textarea id="${textId}" name="${escapeHtml(textName)}" placeholder="${escapeHtml(placeholder)}"></textarea>
     <div class="answer-image-row">
       ${imagePickerMarkup(key)}
@@ -433,9 +434,9 @@ function answerComposer(key, textName, label, placeholder, helper = "文字和�
   </div>`;
 }
 
-function imageAnswerComposer(key, label, helper = "可以补充一张手写图片。") {
+function imageAnswerComposer(key, label) {
   return `<div class="answer-composer" data-answer-key="${escapeHtml(key)}">
-    <div class="field-label">${escapeHtml(label)} <small>${escapeHtml(helper)}</small></div>
+    <div class="field-label">${escapeHtml(label)}</div>
     <div class="answer-image-row">
       ${imagePickerMarkup(key)}
       <span class="upload-status" id="${key}-answer-status" role="status">尚未选择手写图片</span>
@@ -462,28 +463,24 @@ function aiConfigTemplate() {
 
 function importTemplate() {
   return `<section class="stage-card import-card" id="importCard">
-    <div class="stage-number">开始 · 导入题目</div>
-    <h3>先把题目交给思阶</h3>
-    <p class="stage-intro">选择一张清晰的题目图片，或粘贴题目文字。AI会识别初中数学题，并把识别结果交给你确认。</p>
+    <h3>导入题目</h3>
     ${aiConfigTemplate()}
     <form id="problemForm" class="field-stack" novalidate>
-      <label for="problemGrade">年级 <small>用于生成合适的提示和迁移题。</small></label>
+      <label for="problemGrade">年级</label>
       <select id="problemGrade" name="grade" required>
-        <option value="初中其他年级" selected>初中其他年级（可调整）</option>
         <option value="七年级">七年级</option>
         <option value="八年级">八年级</option>
         <option value="九年级">九年级</option>
-        <option value="初中其他年级">初中其他年级</option>
+        <option value="初中其他年级" selected>初中其他年级</option>
       </select>
-      <label for="problemTextInput">题目文字 <small>可选；图片不清楚时可以补充。</small></label>
-      <textarea id="problemTextInput" name="problemText" placeholder="例如：某物体温度约为40℃，另一处是它的11/8，求第三处温度；也可以输入几何题。"></textarea>
+      <label for="problemTextInput">题目文字</label>
+      <textarea id="problemTextInput" name="problemText"></textarea>
       <div class="image-picker">
-        <label for="problemImage-gallery">题目图片 <small>可先用手机相机拍好，再从相册选择上传。</small></label>
-        <label class="drop-zone" for="problemImage-gallery"><span class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><span><strong>选择题图</strong><small>从相册或文件中选择已有图片</small></span></label>
+        <label class="drop-zone" for="problemImage-gallery"><span class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span><strong>选择题图</strong></label>
         ${imagePickerMarkup("problem", { problem: true })}
         <div class="upload-preview" id="problemUploadPreview" hidden><img id="problemImagePreview" alt="题目图片预览"><span class="upload-status" id="problemUploadStatus" role="status">尚未选择图片</span><button class="ghost small-button" id="problemImageClear" type="button">移除图片</button></div>
       </div>
-      <div class="form-actions"><span class="helper">文字和图片至少提供一项。</span><button class="primary" type="submit">识别题目</button></div>
+      <div class="form-actions"><button class="primary" type="submit">识别题目</button></div>
     </form>
     ${state.draft ? draftEditorTemplate(state.draft) : ""}
   </section>`;
@@ -491,7 +488,6 @@ function importTemplate() {
 
 function draftEditorTemplate(draft) {
   const geometry = isGeometryTask(draft);
-  const confidence = asText(state.lastAnalysis?.confidence);
   const needsClarification = state.lastAnalysis?.needsClarification === true || state.lastAnalysis?.decision === "clearer_input";
   const clarification = asText(state.lastAnalysis?.clarification || state.lastAnalysis?.analysis?.clarification, "图片或题意暂时无法确认，请重新拍摄或补充文字后再次识别。");
   const needsTeacherReview = [
@@ -512,14 +508,13 @@ function draftEditorTemplate(draft) {
     "识别结果或题目条件仍需要人工核对，确认后再开始本轮学习。"
   );
   return `<div class="draft-editor" id="draftEditor" aria-labelledby="draftHeading">
-    <div class="divider-label"><span>识别结果</span>${confidence ? `<small>识别置信度：${escapeHtml(confidence)}</small>` : ""}</div>
-    <h4 id="draftHeading">请检查题干和求解目标</h4>
-    <p class="draft-note">下面只显示题面内容，不是你的先思作答。如果题干、数量、单位、目标或图形关系识别得不准确，直接在下面改正。确认后再开始先思。</p>
+    <h4 id="draftHeading">确认题目</h4>
     ${needsClarification ? `<div class="evaluation-box is-clearer" role="alert"><div class="evaluation-head"><span class="evaluation-dot" aria-hidden="true"></span><strong>需要重新识别</strong></div><p>${escapeHtml(clarification)}</p></div>` : ""}
     ${needsTeacherReview ? `<div class="review-note" role="note"><strong>本题建议由老师复核</strong><p>${escapeHtml(teacherReviewReason)}</p></div>` : ""}
     <form id="draftForm" class="field-stack" novalidate>
+      <label for="studentUsername">用户名<input id="studentUsername" name="username" autocomplete="username" maxlength="32" value="${escapeHtml(state.username)}" required></label>
       <label for="draftProblemText">题目文字<textarea id="draftProblemText" name="problemText">${escapeHtml(draft.problemText)}</textarea></label>
-      <label for="draftGoal">题目要求 / 求解目标 <small>这里确认一次，进入先思后会自动带入</small><textarea id="draftGoal" name="goal">${escapeHtml(draft.goal)}</textarea></label>
+      <label for="draftGoal">求解目标<textarea id="draftGoal" name="goal">${escapeHtml(draft.goal)}</textarea></label>
       ${geometry ? `<label for="draftDiagramDescription">图形转录<textarea id="draftDiagramDescription" name="diagramDescription">${escapeHtml(draft.diagramDescription)}</textarea></label>` : ""}
       <div class="form-actions"><button class="secondary" id="reanalyzeProblem" type="button">换一张/重新填写</button><button class="ghost" id="reverifyProblem" type="button">再次核验修正稿</button><button class="primary" type="submit"${needsClarification ? " disabled" : ""}>确认题目并开始</button></div>
     </form>
@@ -551,7 +546,7 @@ const INITIAL_STUCK_POINTS = Object.freeze([
 
 function stuckPointField() {
   return `<fieldset class="choice-field stuck-point-field">
-    <legend>暂时卡住了？先选一个具体卡点 <small>可选；选中后可以直接提交，不需要为了提交编造文字。</small></legend>
+    <legend>卡点（可选）</legend>
     <div class="choice-row stuck-point-row">
       ${INITIAL_STUCK_POINTS.map(value => `<label><input type="radio" name="stuckPoint" value="${escapeHtml(value)}"><span>${escapeHtml(value)}</span></label>`).join("")}
     </div>
@@ -566,20 +561,15 @@ function initialTemplate() {
   return `<section class="stage-card initial-stage-card">
     <div class="stage-number">阶段一 · 先思</div>
     <h3>先整理题目的骨架</h3>
-    <p class="stage-intro">用自己的话写出条件和目标，也可以上传手写整理；题目页可随时回看原题，原题图不算先思。</p>
     ${evaluationCard()}
-    <div class="thinking-boundary" role="note">
-      <strong>先把“已知”和“目标”分开</strong>
-      <p>写清条件、目标或具体卡点；暂时卡住时也可以直接选卡点。题目页可随时回看原题。</p>
-    </div>
     <form id="initialForm" class="field-stack" novalidate>
       <div class="initial-facts">
-        <label for="initialKnown">已知 / 题目条件 <small>把题目明确给出的数量、单位、关系或图形条件写出来，可分行填写。</small><textarea id="initialKnown" name="known" placeholder="例如：土壤表面约40℃；青路面是它的11/8">${escapeHtml(known)}</textarea></label>
-        <label for="initialGoal">求证 / 求解目标 <small>已从题稿确认带入，可直接修改，不必重新抄写。</small><textarea id="initialGoal" name="goal" placeholder="例如：求草坪表面的温度">${escapeHtml(goal)}</textarea></label>
+        <label for="initialKnown">已知条件<textarea id="initialKnown" name="known">${escapeHtml(known)}</textarea></label>
+        <label for="initialGoal">求解目标<textarea id="initialGoal" name="goal">${escapeHtml(goal)}</textarea></label>
       </div>
-      ${imageAnswerComposer("initial", "手写整理（可选）", "如果暂时写不出文字，可以只上传一张自己的手写整理图。")}
+      ${imageAnswerComposer("initial", "手写整理（可选）")}
       ${stuckPointField()}
-      <div class="form-actions"><span class="helper">文字、手写图或具体卡点三者至少提供一种；原题图片不算先思。</span><button class="primary" type="submit">提交先思</button></div>
+      <div class="form-actions"><button class="primary" type="submit">提交先思</button></div>
     </form>
   </section>`;
 }
@@ -635,7 +625,7 @@ function helpOptions() {
     seen.add(id);
     return { id, label };
   }).filter(Boolean).slice(0, 6);
-  return { items: items.length ? items : GENERIC_HELP_OPTIONS, source: source.length ? asText(state.task?.helpOptionsSource, "ai") : "generic" };
+  return items.length ? items : GENERIC_HELP_OPTIONS;
 }
 
 function helpLatestMessage() {
@@ -693,29 +683,26 @@ function helpTemplate() {
   const selectedId = asText(state.formDrafts.help?.selectedOptionId);
   const latestMessage = helpLatestMessage();
   const hasHint = helpHasHint();
-  const optionsRound = Number(state.task?.helpOptionsRound || 0);
-  const optionsSourceLabel = optionsRound > 0 ? "根据刚才的提示整理" : options.source === "ai" ? "AI根据本题整理" : "通用卡点";
   const showEvaluationFeedback = state.lastHelpAction && state.evaluation && asText(state.evaluation.feedback) && state.lastHelpAction !== "hint";
   const inputDraft = state.formDrafts.help || {};
   const supplementOpen = Boolean(inputDraft.supplementOpen || inputDraft.checkOpen);
   const canSubmit = Boolean(selectedId || inputDraft.text || state.answerImages.help);
   const exhausted = Boolean(state.session?.helpExhausted || state.session?.hintsExhausted || hintsUsed >= 3);
   return `<section class="stage-card help-stage-card">
-    <div class="help-heading-row"><div><h3 id="helpStageHeading" tabindex="-1">${hasHint ? "这一步还有哪里不明白？" : "你卡在哪个地方？"}</h3><p class="stage-intro">${hasHint ? "如果这一步仍然卡住，选一个新的点，继续获取提示。" : "选一个不会的点，获得针对性提示。"}</p></div></div>
-    ${exhausted ? `<div class="assisted-callout"><strong>三级提示已给出</strong><span>不会自动展示完整解析。你可以提交给老师，或展开“检查我的理解”后写一句自己的解释。</span></div>` : ""}
+    <div class="help-heading-row"><h3 id="helpStageHeading" tabindex="-1">${hasHint ? "这一步还有哪里不明白？" : "你卡在哪个地方？"}</h3></div>
     ${latestMessage ? `<div class="help-latest" role="status"><div class="help-latest-label"><span class="evaluation-dot" aria-hidden="true"></span><strong>刚才的提示</strong></div><p>${escapeHtml(latestMessage)}</p></div>` : ""}
     ${showEvaluationFeedback ? `<div class="help-feedback" role="status"><p>${escapeHtml(state.evaluation.feedback)}</p>${asText(state.evaluation.nextPrompt) ? `<span>${escapeHtml(state.evaluation.nextPrompt)}</span>` : ""}</div>` : ""}
     <form id="helpForm" class="field-stack" novalidate>
       <fieldset class="help-options-field choice-field">
-        <legend><span class="visually-hidden">先选一个最卡的点</span><small class="help-options-meta">${optionsSourceLabel} · 已用 ${hintsUsed}/3 次提示</small></legend>
-        <div class="help-option-grid">${options.items.map(item => `<label class="help-option"><input type="radio" name="selectedStuckPointId" value="${escapeHtml(item.id)}"${item.id === selectedId ? " checked" : ""}><span>${escapeHtml(item.label)}</span></label>`).join("")}</div>
+        <legend><span class="visually-hidden">卡点</span><small class="help-options-meta">已用 ${hintsUsed}/3 次提示</small></legend>
+        <div class="help-option-grid">${options.map(item => `<label class="help-option"><input type="radio" name="selectedStuckPointId" value="${escapeHtml(item.id)}"${item.id === selectedId ? " checked" : ""}><span>${escapeHtml(item.label)}</span></label>`).join("")}</div>
       </fieldset>
       <details id="helpInputPanel" class="help-collapsible help-input-panel"${supplementOpen ? " open" : ""}>
         <summary>${hasHint ? "写一句你自己的理解" : "补充文字或图片（可选）"}</summary>
-        ${answerComposer("help", "text", hasHint ? "你的理解" : "补充说明", hasHint ? "例如：我认为……因为……" : "可以补充你已经想到的条件、关系或卡点", hasHint ? "写出自己的理由后，可以检查是否真的理解。" : "选卡点已经可以直接求助，文字和图片只是补充。")}
+        ${answerComposer("help", "text", hasHint ? "你的理解" : "补充说明")}
         ${hasHint ? `<div class="help-check-actions"><button class="secondary" id="finishHelp" type="button" disabled>提交理解核验</button></div>` : ""}
       </details>
-      <div class="form-actions help-actions"><span class="helper">${exhausted ? "选中的卡点会一起提交给老师。" : "选择后获得针对性提示。"}</span>${exhausted ? `<button class="primary" id="requestTeacherHelp" type="button"${canSubmit ? "" : " disabled"}>提交给老师</button>` : `<button class="primary" id="helpPrimarySubmit" type="submit"${canSubmit ? "" : " disabled"}>帮我理解</button>`}</div>
+      <div class="form-actions help-actions">${exhausted ? `<button class="primary" id="requestTeacherHelp" type="button"${canSubmit ? "" : " disabled"}>提交给老师</button>` : `<button class="primary" id="helpPrimarySubmit" type="submit"${canSubmit ? "" : " disabled"}>帮我理解</button>`}</div>
       ${hasHint ? `<div class="help-followup-actions"><button class="ghost" id="understoodHelp" type="button">我懂了，进入判别</button><button class="secondary" id="checkHelp" type="button" aria-controls="helpInputPanel" aria-expanded="${supplementOpen ? "true" : "false"}">检查我的理解</button></div>` : ""}
     </form>
     ${knowledgeHtml}
@@ -736,15 +723,14 @@ function stageChoiceMarkup(name, legend, options) {
 
 function judgmentTemplate() {
   const options = state.task?.judgmentCard?.reasonOptions || [];
-  const written = answerComposer("judgment", "reason", "写一句判断理由", "我判断……因为……", "也可以上传手写理由。");
+  const written = answerComposer("judgment", "reason", "写一句判断理由");
   return `<section class="stage-card">
     <div class="stage-number">阶段三 · 判别</div>
     <h3>AI说得像对的，就一定对吗？</h3>
-    <p class="stage-intro">${options.length ? "先选判断，再选一个支持你判断的理由。" : "先判断下面这条解题建议，再写一句理由。"}</p>
     ${evaluationCard()}
     <div class="judgment-card"><span>待核验建议</span><p>${escapeHtml(judgmentStatement())}</p></div>
     <form id="judgmentForm" class="field-stack" novalidate>
-      <fieldset class="choice-field"><legend>你的判断 <small>三选一</small></legend><div class="choice-row">
+      <fieldset class="choice-field"><legend>你的判断</legend><div class="choice-row">
         ${["合理", "不合理", "信息不足"].map(value => `<label><input type="radio" name="verdict" value="${value}" required><span>${value}</span></label>`).join("")}
       </div></fieldset>
       ${options.length ? `${stageChoiceMarkup("reasonOptionId", "你的理由", [...options, { id: "own", text: "我有别的理由" }])}<div id="judgmentWrittenReason" hidden>${written}</div>` : written}
@@ -858,7 +844,7 @@ function transferTemplate() {
     <div class="transfer-task"><span>迁移题</span><p>${escapeHtml(asText(transfer.text || transfer.problemText, "迁移题正在准备，请稍候重试。"))}</p></div>
     <div class="diagram-render" id="transferDiagram" hidden></div>
     <form id="transferForm" class="field-stack" novalidate>
-      ${options.length ? stageChoiceMarkup("stepOptionId", focusPrompt, options) : answerComposer("transfer", "answer", focusPrompt || "写出关键一步", "写一行算式或一句依据……", "也可以上传手写步骤。")}
+      ${options.length ? stageChoiceMarkup("stepOptionId", focusPrompt, options) : answerComposer("transfer", "answer", focusPrompt || "写出关键一步", "一行算式或一句依据")}
       <div class="form-actions"><button class="primary" type="submit">提交迁移作答</button></div>
     </form>
   </section>`;
@@ -882,22 +868,21 @@ function reflectionReviewMarkup() {
   if (transferText) items.push(`<div class="reflection-review-item student"><span>你在迁移题写过</span><p>${escapeHtml(transferText)}</p></div>`);
   if (transferFeedback) items.push(`<div class="reflection-review-item ai"><span>思阶对迁移题的反馈</span><p>${escapeHtml(transferFeedback)}</p></div>`);
   if (!items.length) return "";
-  return `<details class="reflection-review" open><summary><h4>回看这次学习过程</h4></summary><p>下面只回放已经记录的内容，方便你区分自己的想法和思阶的提示。</p>${items.join("")}</details>`;
+  return `<details class="reflection-review"><summary><h4>回看这次学习过程</h4></summary>${items.join("")}</details>`;
 }
 
 function reflectionTemplate() {
   return `<section class="stage-card">
     <div class="stage-number">阶段五 · 反思</div>
     <h3>把帮助还原成自己的方法</h3>
-    <p class="stage-intro">可以简短写下自己的尝试、AI 给过的帮助和下次的做法。</p>
     ${evaluationCard()}
     ${reflectionReviewMarkup()}
     <form id="reflectionForm" class="field-stack" novalidate>
-      <label for="selfWork">我自己完成的部分 <small>可以简单写，也可以只上传一张手写反思图。</small><textarea id="selfWork" name="selfWork" placeholder="我自己先找到了……"></textarea></label>
-      <label for="aiHelp">AI帮助我的部分 <small>例如提示了一个关系、帮我发现一个缺口。</small><textarea id="aiHelp" name="aiHelp" placeholder="AI帮助我……"></textarea></label>
-      <label for="nextTime">下次无 AI 时，我会如何完成类似任务？<textarea id="nextTime" name="nextTime" placeholder="遇到类似的题，我会先……然后……最后……"></textarea></label>
-      ${answerComposer("reflection", "text", "手写反思（可选）", "可以把反思写在纸上，用手机相机拍好后上传图片。", "上面三段文字和这一张图片共用一个提交。")}
-      <div class="form-actions"><span class="helper">三段文字和图片至少完成一项。</span><button class="primary" type="submit">完成学习</button></div>
+      <label for="selfWork">我自己完成的部分<textarea id="selfWork" name="selfWork"></textarea></label>
+      <label for="aiHelp">AI 帮助我的部分<textarea id="aiHelp" name="aiHelp"></textarea></label>
+      <label for="nextTime">下次无 AI 时，我会如何完成类似任务？<textarea id="nextTime" name="nextTime"></textarea></label>
+      ${imageAnswerComposer("reflection", "手写反思（可选）")}
+      <div class="form-actions"><button class="primary" type="submit">完成学习</button></div>
     </form>
   </section>`;
 }
@@ -985,7 +970,6 @@ function completedTemplate() {
   return `<section class="stage-card completed-card">
     <div class="stage-number">完成本轮</div>
     <h3>完成本轮流程</h3>
-    <p class="stage-intro">本轮五阶段已结束。请结合独立作答、辅助记录和反思回看；完成流程不等于独立掌握。</p>
     ${learningOutcomeMarkup()}
     ${summary ? `<div class="summary-box"><h4>这次学习摘要</h4>${summaryMarkup(summary)}</div>` : ""}
     ${reference ? `<details class="reference-details"><summary>查看参考思路</summary><div class="reference-proof">${escapeHtml(asText(reference))}</div></details>` : ""}
@@ -1016,7 +1000,6 @@ function updateStepper() {
     item.classList.toggle("is-current", index === Math.min(current, 4) && stage !== "completed");
     item.classList.toggle("is-done", index < current || stage === "completed");
   });
-  $("#anonymousId").textContent = state.session?.anonymousId || state.session?.anonymous_id || "尚未建立匿名会话";
 }
 
 function responseEvaluation(result) {
@@ -1088,9 +1071,7 @@ function updateMobileFlowA11y() {
   topic.inert = topicHidden;
   learning.inert = learningHidden;
   const next = $("#mobileTopicNext");
-  const hint = $("#mobileTopicHint");
   if (next) next.hidden = !state.session;
-  if (hint) hint.textContent = state.session ? "题目已确认；可以回看题目，也可以进入当前阶段。" : "导入并确认题目后，可以进入当前阶段。";
   syncMobileTrackHeight();
 }
 
@@ -1289,6 +1270,8 @@ function bindAiConfigForm() {
 function bindDraftForm() {
   const form = $("#draftForm");
   if (!form) return;
+  const usernameInput = $("#studentUsername");
+  usernameInput.addEventListener("input", () => { state.username = usernameInput.value; });
   $("#reanalyzeProblem")?.addEventListener("click", () => {
     state.draft = null;
     state.draftId = "";
@@ -1321,6 +1304,12 @@ function bindDraftForm() {
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const edits = Object.fromEntries(new FormData(form));
+    const username = usernameInput.value.trim();
+    if (!username) {
+      usernameInput.focus();
+      return toast("请输入用户名。", true);
+    }
+    delete edits.username;
     const draft = { ...(state.draft || {}), ...edits };
     if (!String(draft.problemText || "").trim()) return toast("请至少补充题目文字，再确认。", true);
     if (!String(draft.goal || draft.proofGoal || "").trim()) return toast("请补充题目要求或求解目标，再确认。", true);
@@ -1330,7 +1319,7 @@ function bindDraftForm() {
     const draftForServer = Object.fromEntries(Object.entries(draft).filter(([key]) => key !== "learningGoal"));
     setBusy(form, true, "正在生成学习任务…");
     try {
-      const result = await api("/api/session", { method: "POST", body: JSON.stringify({ draftId: state.draftId || undefined, draft: draftForServer, analysis: draftForServer, ...draftForServer, grade: state.grade || draft.grade, imageData: state.problemImage?.dataUrl || undefined }) });
+      const result = await api("/api/session", { method: "POST", body: JSON.stringify({ draftId: state.draftId || undefined, draft: draftForServer, analysis: draftForServer, ...draftForServer, grade: state.grade || draft.grade, imageData: state.problemImage?.dataUrl || undefined, username }) });
       acceptResponse(result);
       if (!state.session) throw new Error("服务没有返回会话，请重试。 ");
       if (!state.task) applyTask({ ...draft, grade: state.grade });
@@ -1694,6 +1683,7 @@ function bindForms() {
   });
   $("#newSession")?.addEventListener("click", () => {
     mobileFlowState.scroll = { topic: 0, learning: 0 };
+    state.username = "";
     state.task = null; state.session = null; state.draft = null; state.draftId = ""; state.grade = ""; state.problemImage = null; state.answerImages = {}; state.formDrafts = Object.create(null); state.imageJobs = Object.create(null); state.imageBusy = false; state.evaluation = null; state.lastReply = null; state.summary = null; state.learningOutcome = null; state.lastResult = null; state.mobileScreen = "topic";
     $("#problemEmpty").hidden = false; $("#problemSummary").hidden = true;
     renderStudent();

@@ -150,6 +150,7 @@ async function main() {
     await page.fill("#problemTextInput", "2x=4");
     await page.click("#problemForm button[type=submit]");
     await page.waitForSelector("#draftForm");
+    await page.fill("#studentUsername", "验收学生");
     await page.click("#draftForm button[type=submit]");
     await page.waitForSelector("#mobileFlow[data-screen=learning]");
     await page.waitForTimeout(50);
@@ -201,6 +202,7 @@ async function main() {
     await draftPage.fill("#problemTextInput", "2x=4");
     await draftPage.click("#problemForm button[type=submit]");
     await draftPage.waitForSelector("#draftForm");
+    await draftPage.fill("#studentUsername", "验收学生");
     await draftPage.click("#draftForm button[type=submit]");
     await draftPage.waitForSelector("#initialForm");
     assert.match(await draftPage.locator("#studentContent").innerText(), /本题建议由老师复核/u, "非完成阶段也应展示学生可理解的复核提示");
@@ -239,6 +241,7 @@ async function main() {
     await desktopPage.fill("#problemTextInput", "2x=4");
     await desktopPage.click("#problemForm button[type=submit]");
     await desktopPage.waitForSelector("#draftForm");
+    await desktopPage.fill("#studentUsername", "验收学生");
     await desktopPage.click("#draftForm button[type=submit]");
     await desktopPage.waitForSelector("#studentContent .completed-card");
     const desktopRects = await desktopPage.evaluate(() => {

@@ -193,6 +193,7 @@ async function openHelpPage(browser, baseUrl, { viewport, mobile = false, config
   await page.fill("#problemTextInput", "土壤表面约40℃，求草坪表面温度");
   await page.click("#problemForm button[type=submit]");
   await page.waitForSelector("#draftForm");
+  await page.fill("#studentUsername", "验收学生");
   await page.click("#draftForm button[type=submit]");
   if (config.initialStage !== "help") {
     await page.waitForSelector("#initialForm");

@@ -22,6 +22,7 @@ import {
   applyInitialEvaluation,
   availableHint,
   createSession,
+  normalizeUsername,
   finishHelp,
   recordHintEvaluation,
   sanitizeSession,
@@ -150,7 +151,7 @@ function taskReviewFromGeneration(generated = {}) {
 }
 
 function publicSession(session, { includeKnowledge = false } = {}) {
-  const safe = sanitizeSession(session);
+  const safe = sanitizeSession(session, { includeUsername: false });
   safe.learningOutcome = summarizeLearningOutcome(session, { publicView: true });
   if (session.taskReview) safe.taskReview = publicTaskReview(session.taskReview);
   const references = Array.isArray(safe.knowledgeReferences) ? safe.knowledgeReferences : [];
@@ -315,6 +316,8 @@ async function handleApi(request, env, store, model, url) {
 
   if (request.method === "POST" && url.pathname === "/api/session") {
     const body = await readJson(request);
+    const username = normalizeUsername(body.username);
+    if (!username) return json(400, { error: "请输入 1–32 个字符的用户名。", code: "INVALID_USERNAME" });
     const savedDraft = await store.draft(String(body.draftId || ""));
     const submittedRecognition = body.problem || body.recognition || body.recognizedProblem || body.analysis;
     if (!savedDraft && !(body.confirmed === true && submittedRecognition)) return json(400, { error: "识题结果已失效，请重新识别题目。", code: "DRAFT_NOT_FOUND" });
@@ -347,7 +350,7 @@ async function handleApi(request, env, store, model, url) {
     const taskReview = taskReviewFromGeneration(generated);
     const task = { ...generated.task, taskReview, diagramPath: savedDraft?.imagePath || null };
     await store.saveTask(task);
-    const session = createSession(task.id);
+    const session = createSession(task.id, undefined, { username });
     session.taskReview = structuredClone(taskReview);
     recordKnowledgeReferences(session, generated, STAGES.INITIAL, "task_generation");
     await store.saveSession(sanitizeSession(session));
